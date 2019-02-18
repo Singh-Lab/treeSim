@@ -71,7 +71,7 @@ def readHostTree(treeFile, treeHeight = -1):
 
         Args:
             treeFile (str ): name of file to read
-            treeHeight (float ): Rescales branch lengths such that the average root to leaf path
+            treeHeight (float ): Rescales branch lengths such that the mean root to leaf path
                                  matches the desired tree height. Ignored if treeHeight <= 0
         Output:
             host (Tree): The host tree in ete3 Tree format
