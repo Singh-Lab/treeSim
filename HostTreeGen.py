@@ -1,17 +1,6 @@
 from ete3 import Tree
 import numpy as np
 
-#TODO: Add other functions (esp exponential distribution?)
-#####################################
-#                                   #
-#   Height Distribution Functions   #
-#                                   #
-#####################################
-
-def gaussNoise(n):
-    """"Returns a float drawn from N(n, .1*n)"""
-    return np.random.normal(n, .1*n)
-
 #####################################
 #                                   #
 #       Host Tree Generation        #

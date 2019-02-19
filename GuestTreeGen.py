@@ -2,6 +2,7 @@ from ete3 import Tree
 import numpy as np
 from scipy.stats import expon
 from math import exp
+from TreeUtils import gaussNoise
 
 LOSS_CODE = -1
 DUPLICATION_FACTOR = 3
@@ -11,30 +12,6 @@ DUPLICATION_FACTOR = 3
 #         Helper Functions          #
 #                                   #
 #####################################
-
-def expfunc(minimum=1, maximum=3):
-    """Exponential distribution with lambda=0.75 and min/max parameters"""
-    return min(maximum, max(minimum, int(expon(0.75).rvs())))
-
-def s(x):
-    """Sigmoid function designed to quickly reduce losses as domains are lost"""
-    denom = 1 + exp(8-x)
-    return .7 - .3 / denom
-
-def s2(x):
-    denom = 1 + exp(10-x)
-    return .7 - .6 / denom
-
-def s3(x):
-    if x >= 13:
-        return 0
-    if x <= 7:
-        return 1
-    return s2(x)
-
-def gaussNoise(n):
-    """"Returns a float drawn from N(n, .1*n)"""
-    return np.random.normal(n, .1*n)
 
 def createNode():
     """Creates a domain node with required fields precreated"""
