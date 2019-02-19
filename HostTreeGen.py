@@ -42,7 +42,7 @@ def assignBranchLengths(tree, treeHeight, heightDistribution):
         if node.height == 0:
             node.dist = remainingDist
         else:
-            node.dist = gaussNoise(remainingDist / (node.height + 1.))
+            node.dist = heightDistribution(remainingDist / (node.height + 1.))
 
 def genHostTree(numLeaves, treeHeight, heightDistribution):
     """
@@ -50,6 +50,7 @@ def genHostTree(numLeaves, treeHeight, heightDistribution):
     Args:
         numLeaves (int ): The number of leaves desired in the host tree
         treeHeight (float): The average overall length of a root to leaf path
+        heightDistribution (func): 
     Output:
         host (Tree): The host tree in ete3 Tree format
     """

@@ -1,5 +1,7 @@
 from ete3 import Tree
 import numpy as np
+from scipy.stats import expon
+from math import exp
 
 LOSS_CODE = -1
 DUPLICATION_FACTOR = 3
@@ -9,6 +11,26 @@ DUPLICATION_FACTOR = 3
 #         Helper Functions          #
 #                                   #
 #####################################
+
+def expfunc(minimum=1, maximum=3):
+    """Exponential distribution with lambda=0.75 and min/max parameters"""
+    return min(maximum, max(minimum, int(expon(0.75).rvs())))
+
+def s(x):
+    """Sigmoid function designed to quickly reduce losses as domains are lost"""
+    denom = 1 + exp(8-x)
+    return .7 - .3 / denom
+
+def s2(x):
+    denom = 1 + exp(10-x)
+    return .7 - .6 / denom
+
+def s3(x):
+    if x >= 13:
+        return 0
+    if x <= 7:
+        return 1
+    return s2(x)
 
 def gaussNoise(n):
     """"Returns a float drawn from N(n, .1*n)"""
@@ -67,13 +89,13 @@ def clean(host, guest):
     allowedFeatures = ['support','dist','name','event']
 
     for node in host:
-        features = node.features
+        features = node.features.copy()
         for feature in features:
             if feature not in allowedFeatures:
                 node.del_feature(feature)
 
     for node in guest:
-        features = node.features
+        features = node.features.copy()
         for feature in features:
             if feature not in allowedFeatures:
                 node.del_feature(feature)        
@@ -121,10 +143,10 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
 
     while(branchLength > dist and len(leaves) > 0):
         event = np.random.random()
+        branchLength -= dist
     
         #Duplication
         if event < dupRateFunc(len(leaves)):
-            branchLength -= dist
             numDomains = len(leaves)
             size = dupfunc(1, len(leaves))
             start = np.random.randint(numDomains - size + 1)
@@ -156,7 +178,7 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
             for i in range(position, len(leaves)):
                 leaves[i].pos -= 1
 
-        dist = branchFunc()
+        dist = branchFunc(eventDist)
 
     for node in leaves:
         if 'bl' in node.features:
@@ -196,8 +218,7 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
 
     for hostNode in host.traverse():
         if hostNode == host: #Root node
-            opstack, branchLength = buildGuestNode(guest, dupRateFunc, dupfunc, hostNode.name, hostNode.dist)
-            hostNode.add_feature('ops', opstack)
+            branchLength = buildGuestNode(guest, dupRateFunc, dupfunc, hostNode.name, hostNode.dist)
             hostNode.bl = branchLength
             nodemap[hostNode] = [node for node in guest.traverse()]
             hostNode.add_feature('leaves', [leaf for leaf in guest if leaf.pos != LOSS_CODE])
@@ -224,7 +245,7 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
             supernode = Tree()
             supernode.children = newTrees
 
-            opstack, branchLength = buildGuestNode(supernode, dupRateFunc, dupfunc, 
+            branchLength = buildGuestNode(supernode, dupRateFunc, dupfunc, 
                                     hostNode.name, hostNode.dist, branchFunc, eventDist)
             hostNode.bl = branchLength
 
