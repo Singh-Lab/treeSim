@@ -26,3 +26,8 @@ def printProgressBar(iteration, total, prefix='Progress', suffix='', decimals=1,
     if iteration == total:
         sys.stdout.write('\n')
     sys.stdout.flush()
+
+#From: https://stackoverflow.com/questions/6618515/sorting-list-based-on-values-from-another-list
+def sortBy(a,b):
+    """Sorts list a by the values in list b. Not in place."""
+    return [x for (_,x) in sorted(zip(b,a))]
