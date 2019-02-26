@@ -65,6 +65,7 @@ def findDomains(sequence, hmmfile):
 	
 	return findDomainsFile('tmp/tmp.fa', hmmfile)
 
+#TODO: Change so that it takes one domain per column rather than one domain per column
 def genRandomSequence(numDoms, datapath, hmmfile):
     """
     Generates a random zf-C2H2 protein sequence with the given number of domains.
