@@ -15,6 +15,28 @@ def uncorrelatedRelaxation(tree, method='exponential'):
                        default to exponential
     """
 
-    rateFunc = stats.exp(1)
-    if method == 'gamma': rateFunc = stats.gamma
-    if method == 'gaussian' : rateFunc = stats.gaussian()
+    rateFunc = stats.exp
+    #if method == 'gamma': rateFunc = stats.gamma
+    if method == 'gaussian' : rateFunc = stats.gaussian
+    
+    for node in tree.traverse():
+        rate = rateFunc(node.dist)
+        node.add_feature('rate', rate)
+        node.dist = rate
+        
+def autocorrelatedRelaxation(tree):
+    """
+    Relaxes branches using an autocorrelated process. In this process, each node is
+    assigned a rate parameter R_i, and the rate multiplier on a branch of length l between nodes
+    i and j is l * (R_i + R_j) / 2. The root node's rate is set to 1.
+    """
+
+    tree.add_feature('rate', 1)
+
+    for node in tree.traverse():
+        if node == tree:
+            continue
+        node.add_feature('rate', stats.logN(node.up.rate, node.dist))
+        node.dist *= (node.up.rate + node.rate) / 2.
+
+    
