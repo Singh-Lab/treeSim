@@ -1,0 +1,12 @@
+#General Datapath
+DATAPATH = ~/Data/
+#Path to Directory containing fasta files for orthogroups of interest
+ORTHOGROUP_PATH = ~/Data/eutheria/
+
+#HOST TREE GENERATION PARAMETERS
+
+#GUEST TREE GENERATION PARAMETERS
+
+#BRANCH RELAXATION PARAMETERS
+
+#
