@@ -7,7 +7,10 @@ import os
 
 #Tree I/O 
 def readTree(filename):
-    """Reads a tree in newick or NHX format to an ete3 object"""
+    """
+    Reads a tree in newick or NHX format to an ete3 object. To read trees not created by 
+    this package, see readHostTree in HostTreeGen.py
+    """
     return Tree(filename, format=1)
 
 def writeTree(tree, filename):

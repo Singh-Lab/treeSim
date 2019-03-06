@@ -2,7 +2,7 @@ from ete3 import Tree
 import numpy as np
 from scipy.stats import expon
 from math import exp
-from TreeUtils import gaussNoise
+from stats import gaussNoise
 
 LOSS_CODE = -1
 DUPLICATION_FACTOR = 3
@@ -174,8 +174,9 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
         dupfunc (func): A function which returns the size of a tandem duplication.
                         Must be of the form dupfunc(x,y), where x and y are the 
                         min and max duplication sizes respectively
-        eventDist (func): function that takes no arguments and returns the distance to 
+        eventDist (float): function that takes no arguments and returns the distance to 
                           the next evolutionary event
+        branchFunc (func): takes eventDist as input, returns actual distance between two events
         startSize (int ): The number of leaves in the initial guest, prior to any
                           evolutionary event.
 
@@ -195,7 +196,7 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
 
     for hostNode in host.traverse():
         if hostNode == host: #Root node
-            branchLength = buildGuestNode(guest, dupRateFunc, dupfunc, hostNode.name, hostNode.dist)
+            branchLength = buildGuestNode(guest, dupRateFunc, dupfunc, hostNode.name, hostNode.dist, branchFunc, eventDist)
             hostNode.bl = branchLength
             nodemap[hostNode] = [node for node in guest.traverse()]
             hostNode.add_feature('leaves', [leaf for leaf in guest if leaf.pos != LOSS_CODE])
