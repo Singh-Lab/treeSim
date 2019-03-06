@@ -61,7 +61,11 @@ def birthDeathTree(birthRate, deathRate, treeHeight):
     Generates a tree topology according to the birth-death model.
     
     Args:
-        birthRate: birth rate of 
+        birthRate (float): birth rate 
+        deathRate (float): death rate
+        treeHeight (float): The average overall length of a root to leaf path
+        numLeaves (int): The number of leaves desired at the end of the run. If 
+                         the input is <= 0, this parameter is ignored and   
     """
     birthRate = float(birthRate)
     deathRate = float(deathRate)
@@ -73,7 +77,7 @@ def birthDeathTree(birthRate, deathRate, treeHeight):
     while lineages != []:
         #waiting time is exp(b + d), P(b) = b/(b+d), P(d) = 1 - P(b)
         node, height = lineages.pop(0)
-        eventTime = stats.expon(birthRate + deathRate).rvs(size=1)[0]
+        eventTime = stats.exp(1./(1./birthRate + 1./deathRate))
 
         #event occurs
         if eventTime <= height:
@@ -89,7 +93,7 @@ def birthDeathTree(birthRate, deathRate, treeHeight):
         #If no event occurs, credit remaining branch length to this node
         else:
             node.dist += height
-            
+                
     if host.children == []:
         host.name = "H0"
         return host
@@ -122,10 +126,35 @@ def birthDeathTree(birthRate, deathRate, treeHeight):
 
     return host
 
+def BDMinMax(birthRate, deathRate, treeHeight, minLeaves = 0, maxLeaves = float('inf')):
+    """
+    Creates a birth death tree within the desired range of leaves. Produces a warning if
+    the input birth/death rates are unlikely to produce a tree with the desired number of 
+    leaves.
+    """
+    #TODO: ADD WARNING IF PARAMETERS ARE MISMATCHED -> sum of exps is gaussian (goddammit)
+    """
+    mean = 1./(1./birthRate - 1./deathRate)
+
+    if minLeaves > 2 * mean or maxLeaves < 0:
+        print """
+
+    incorrect = True
+
+    while(incorrect):
+        host = birthDeathTree(birthRate, deathRate, treeHeight)
+        numLeaves = len([leaf for leaf in host])
+        incorrect = numLeaves <= minLeaves or numLeaves >= maxLeaves
+
+    return host
+    
+
 def readHostTree(treeFile, treeHeight = -1):
     """
-     Reads input file and ensures that every node has a label (or labels it otherwise) and
-    optionally rescales the branch lengths so that the average height is the desired one
+    Reads input file and ensures that every node has a label (or labels it otherwise) and
+    optionally rescales the branch lengths so that the average height is the desired one. 
+    Unlike readTree in TreeUtils, this function is intended to read trees not created by
+    this package.
 
     Args:
         treeFile (str ): name of file to read
@@ -158,6 +187,6 @@ def readHostTree(treeFile, treeHeight = -1):
 
 #Test cases
 if __name__ == "__main__":
-    t = birthDeathTree(0.3,0.1,10)
+    t = birthDeathTree(0.3,0.1,1)
     print t.get_ascii()
     print t.get_ascii(attributes=['dist'])

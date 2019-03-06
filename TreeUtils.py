@@ -5,14 +5,72 @@ from Utils import sortBy
 import numpy as np
 import os
 
-#Tree I/O TODO: switch to NHX format to store node annotations
-def read(filename):
-    """Reads a tree in newick format to an ete3 object"""
+#Tree I/O 
+def readTree(filename):
+    """
+    Reads a tree in newick or NHX format to an ete3 object. To read trees not created by 
+    this package, see readHostTree in HostTreeGen.py
+    """
     return Tree(filename, format=1)
 
-def write(tree, filename):
+def writeTree(tree, filename):
     """Writes an ete3 tree to the given filename in NHX format"""
-    tree.write(outfile=filename, format=1)
+    output = tree.write(outfile=filename, format=1, features=[])[:-1]
+
+    #For whatever reason ete3 doesn't include root name + features, so this adds it on
+    output += tree.name + "[&&NHX"
+    for feature in tree.features:
+        output += ":" + str(feature) + '=' + str(getattr(tree, feature))
+    output += '];'
+
+    outputHandle = open(filename, 'w')
+    outputHandle.write(output)
+    outputHandle.cltose()
+
+def readMapping(host, guest, mapfile):
+    """
+    Requires that the host and guest tree that the mapping refers to have already 
+    been read into memory. See writeMapping for mapfile format
+
+    Args:
+        host    (Tree): The host tree
+        guest   (Tree): The guest tree
+        mapfile (str ): Name of the file containing mapping between host and guest nodes
+
+    Output:
+        nodeMap (dict): A mapping of host -> [guest] nodes
+    """
+
+    nodemap = {}
+    for node in host.traverse():
+        nodemap[node] = []
+
+    nodemapFile = list(open(mapfile))
+
+    for line in nodemapFile:
+        line = line.split()
+        hostNode = host&line[0]
+        mapped = []
+        for guestName in line[1:]:
+            guestNode = guest&guestName
+            mapped.append(guestNode)
+        nodemap[hostNode] = mapped
+
+    return nodemap
+
+def writeMapping(nodemap, filename):
+    """
+    Writes out a mapping between host nodes and guest nodes. Each line of the output
+    consists of a host node name followed by the names of each of the guest nodes 
+    that maps to it (all separated by spaces).
+    """
+    outputHandle = open(filename, 'w')
+
+    for node in nodemap:
+        out = node.name + ' ' + ' '.join([i.name for i in nodemap[node]])
+        outputHandle.write(out + '\n')
+
+    outputHandle.close()
 
 #Duplication rate functions for use with guest tree generation
 def s(x):
