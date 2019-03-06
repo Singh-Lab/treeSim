@@ -20,7 +20,7 @@ if(True or RUN_ALL):
     print "\nBirthDeath Host + BuildGuestTree"
     sizes = []
     for i in range(100):
-        treeHeight = 5 * np.random.random()
+        treeHeight = np.random.random()
         host = HostTreeGen.birthDeathTree(.3, .1, treeHeight)
         sizes.append(len([leaf for leaf in host]))
         guest, nodemap = GuestTreeGen.buildGuestTree(host, s3, expfunc, treeHeight / 5, gaussNoise, 10)
