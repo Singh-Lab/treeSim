@@ -3,7 +3,7 @@ DATAPATH = /home/caluru/Data/
 #Path to Directory containing fasta files for orthogroups of interest
 ORTHOGROUP_PATH = /home/caluru/Data/eutheria/
 #Path to hmm file
-HMM_PATH = zf_shilpa.hmm
+HMM_PATH = /home/caluru/Data/hmmfiles/zf_shilpa_232.hmm
 
 #HOST TREE GENERATION PARAMETERS
 
