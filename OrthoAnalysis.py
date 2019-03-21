@@ -1,6 +1,8 @@
 #Contains functions for manipulating and analyzing orthogroup files
 import os
 from TreeUtils import findDomains
+from ConfigParser import ConfigParser
+from RetrieveOrthogroup import fastaToSeqs
 
 #Checks if the input string is a valid zf-C2H2 domain
 def isValid(domain):
@@ -48,3 +50,10 @@ def groupDomains(names, sequences, hmmfile):
 		grouped.append(domains)
 		domNames.append(dnames)
 	return grouped, domNames
+
+if __name__ == "__main__":
+    data = ConfigParser.ORTHOGROUP_PATH #pylint: disable=no-member
+    group = data + os.listdir(data)[0]
+    hmmfile = ConfigParser.HMM_PATH #pylint: disable=no-member
+    names, sequences, speciesIDs = fastaToSeqs(list(open(group)))
+    grouped, domNames = groupDomains(names, sequences, hmmfile)
