@@ -38,7 +38,7 @@ def groupDomains(names, sequences, hmmfile):
         domNames  (list): A list of lists of domain names for each domain in each sequence
     """
 
-    domStarts = [sorted(findDomains(i, hmmfile)[0]) for i in sequences]
+    domStarts = [findDomains(i, hmmfile)[0] for i in sequences]
     domNames = []
     allStarts = sorted(list(set.union(*[set(i) for i in domStarts])))
     grouped = []
@@ -51,6 +51,69 @@ def groupDomains(names, sequences, hmmfile):
         grouped.append(domains)
         domNames.append(dnames)
     return grouped, domNames
+
+def filter(names, sequences, speciesIDs, hmmfile):
+    """
+    Filters an orthogroup to remove every entry with no domain instances.
+    
+    Args:
+        names: The name of each sequence
+        sequences: The sequences to be filtered
+        speciesIDs:
+        
+    """
+
+def removeDuplicates(names, sequences, speciesIDs):
+    """
+    Removes duplicate entries, where bot the name and speciesID match
+
+    Args:
+        names: gene names
+        sequences: raw gene sequences
+        speciesIDs: species IDs
+
+    """
+
+    used = set()
+    for i in range(len(names)-1, -1, -1):
+        if (names[i], speciesIDs[i]) in used:
+            names.pop(i)
+            sequences.pop(i)
+            speciesIDs.pop(i)
+        else:
+            used.add((names[i], speciesIDs[i]))
+            names[i] += "_" + speciesIDs[i]  
+
+def oneToOneSequences(sequences, speciesIDs):
+    """
+    Given a fasta file of an orthogroup, checks whether it is one to one.
+    This means that the same number of sequences exist per species (this
+    could mean two human and two chimp sequences, but not two human and 
+    three chimp sequences. Returns True/False if the set is/isn't 1-1
+    """
+    seqsBySpecies = {}
+    for i in range(len(sequences)):
+        if speciesIDs[i] in seqsBySpecies:
+            seqsBySpecies[speciesIDs[i]].append(sequences[i])
+        else:
+            seqsBySpecies[speciesIDs[i]] = [sequences[i]]
+
+    
+    firstLen = len(seqsBySpecies[seqsBySpecies.keys()[0]])
+    for key in seqsBySpecies.keys():
+        if len(seqsBySpecies[key]) != firstLen:
+            return False
+
+    return True
+
+def oneToOneDomains(sequences, hmmfile):
+    #finds all domains occurences in each sequence
+    domains = []
+    for seq in sequences:
+        domains.append(findDomains(seq, hmmfile)[2])
+
+    firstlen = len(domains[0])
+
 
 if __name__ == "__main__":
     data = ConfigParser.ORTHOGROUP_PATH #pylint: disable=no-member
