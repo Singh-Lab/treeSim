@@ -1,3 +1,5 @@
+from sys import exit
+
 class ConfigParser(object):
     pass
 
@@ -6,6 +8,7 @@ for line in f:
     if line[0] == "#" or len(line) < 3:
         continue
     line = line.split()
-    assert len(line) == 3
-    assert line[1] == '='
+    if len(line) != 3 or line[1] != '=':
+        print "Config File Parsing Error"
+        exit(1)
     setattr(ConfigParser, line[0], line[-1])

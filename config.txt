@@ -1,9 +1,14 @@
 #General Datapath
 DATAPATH = /home/caluru/Data/
+
 #Path to Directory containing fasta files for orthogroups of interest
 ORTHOGROUP_PATH = /home/caluru/Data/eutheria/
+
 #Path to hmm file
 HMM_PATH = /home/caluru/Data/hmmfiles/zf_shilpa_232.hmm
+
+#Path to Substitution Matrix
+PAM = /home/caluru/Data/substitution_matrices/PAM100.txt
 
 #HOST TREE GENERATION PARAMETERS
 
