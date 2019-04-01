@@ -93,35 +93,35 @@ def s3(x):
 
 #Finds all domains in infile according to hmm in hmmfile using hmmsearch232
 def findDomainsFile(infile, hmmfile):
-	#domName = os.popen("grep 'NAME' " + hmmfile).read().split()[1]
-	seqName = list(open(infile))[0][1:].strip()
-	os.system("hmmsearch232 -E 0.00001 " + hmmfile + " " + infile 
-				+ " | grep '^ [ ]*" + seqName + "' > tmp/grepoutput.txt")
-	hits = list(open('tmp/grepoutput.txt'))
-	starts, ends, seqs = [], [], []
+    #domName = os.popen("grep 'NAME' " + hmmfile).read().split()[1]
+    seqName = list(open(infile))[0][1:].strip()
+    os.system("hmmsearch232 -E 0.00001 " + hmmfile + " " + infile 
+                + " | grep '^ [ ]*" + seqName + "' > tmp/grepoutput.txt")
+    hits = list(open('tmp/grepoutput.txt'))
+    starts, ends, seqs = [], [], []
 
-	for line in hits:
-		line = line.split()
-		if not line[1].isdigit():
-			continue
-		starts.append(int(line[1]) - 1) #HMMER is 1-indexed :/
-		ends.append(int(line[3]) - 1)
-		seqs.append(line[2])
+    for line in hits:
+        line = line.split()
+        if not line[1].isdigit():
+            continue
+        starts.append(int(line[1]) - 1) #HMMER is 1-indexed :/
+        ends.append(int(line[3]) - 1)
+        seqs.append(line[2])
 
-	#HMMER doesn't sort by position in the sequence. This fixes that
-	seqs = sortBy(seqs, starts)
-	starts.sort()
-	ends.sort()
-		
-	return starts, ends, seqs
+    #HMMER doesn't sort by position in the sequence. This fixes that
+    seqs = sortBy(seqs, starts)
+    starts.sort()
+    ends.sort()
+        
+    return starts, ends, seqs
 
 #Finds all domains in the input sequence according to hmm in hmmfile using hmmsearch232	
 def findDomains(sequence, hmmfile):
-	g = open('tmp/tmp.fa','w')
-	g.write('>seq\n' + sequence)
-	g.close()
-	
-	return findDomainsFile('tmp/tmp.fa', hmmfile)
+    g = open('tmp/tmp.fa','w')
+    g.write('>seq\n' + sequence)
+    g.close()
+    
+    return findDomainsFile('tmp/tmp.fa', hmmfile)
 
 #TODO: Change so that it takes one domain per column rather than one domain per column
 def genRandomSequence(numDoms, datapath, hmmfile):
@@ -150,10 +150,43 @@ def genRandomSequence(numDoms, datapath, hmmfile):
     for i in range(len(starts)-1):
         linkers.append(sequence[ends[i]+1:starts[i+1]])
     
-	middle = ''
+    middle = ''
     for _ in range(numDoms - 1):
         middle += np.random.choice(seqs) + np.random.choice(linkers)
     middle += np.random.choice(seqs)
 
     newSeq = prefix + middle + suffix
     return ''.join(newSeq.split('-'))
+
+def printDomSeq(sequence, hmmfile):
+    """
+    prints the sequence with domains highlighted in red 
+    (first character highlighted in green)
+    """
+
+    #Escape sequences used to colorize terminal output
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    NORMAL = '\033[0m'
+
+    #Find domains, check if sequence begins and/or ends with a domain
+    starts, ends, domains = findDomains(sequence, hmmfile)
+
+    #split on all domains
+    for domain in domains:
+        sequence = sequence.replace(domain, "xxx")
+    sequences = sequence.split("xxx")
+    
+    #Reassemble full sequence post evolution
+    out = ''
+    for i in range(len(domains)):
+        out += sequences[i] + GREEN + domains[i][0] + RED + domains[i][1:] + NORMAL
+    out += sequences[-1] if len(sequences) > len(domains) else RED + domains[-1] + NORMAL
+
+    print out
+
+def isValid(domain):
+    """Checks if the input string is a valid zf-C2H2 domain"""
+    valid = len(domain) == 23 and domain[2] == "C" and domain[5] == "C"
+    valid &= domain[18] == "H" and domain[22] == "H"
+    return valid

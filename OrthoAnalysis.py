@@ -1,15 +1,13 @@
 #Contains functions for manipulating and analyzing orthogroup files
 import os
+import numpy as np
 from TreeUtils import findDomains
 from ConfigParser import ConfigParser
 from RetrieveOrthogroup import fastaToSeqs
-
-#
-def isValid(domain):
-    """Checks if the input string is a valid zf-C2H2 domain"""
-    valid = len(domain) == 23 and domain[2] == "C" and domain[5] == "C"
-    valid &= domain[18] == "H" and domain[22] == "H"
-    return valid
+from Similarity import domainSim, sequenceSim
+from matplotlib import pyplot as plt
+import seaborn as sns
+from Fasta import FastaFile
 
 def groupDomains(names, sequences, hmmfile):
     """
@@ -52,16 +50,18 @@ def groupDomains(names, sequences, hmmfile):
         domNames.append(dnames)
     return grouped, domNames
 
-def filter(names, sequences, speciesIDs, hmmfile):
+def filter(ff, hmmfile):
     """
     Filters an orthogroup to remove every entry with no domain instances.
     
     Args:
-        names: The name of each sequence
-        sequences: The sequences to be filtered
-        speciesIDs:
-        
+        ff (FastaFile): A fastafile object representation of the orthogroup
+        hmmfile (str ): The file path to the hmm representation of the domain
     """
+
+    for i in range(ff.length()):
+        if len(ff.getDomains(i)) == 0:
+            ff.delete(i)
 
 def removeDuplicates(names, sequences, speciesIDs):
     """
@@ -84,13 +84,16 @@ def removeDuplicates(names, sequences, speciesIDs):
             used.add((names[i], speciesIDs[i]))
             names[i] += "_" + speciesIDs[i]  
 
-def oneToOneSequences(sequences, speciesIDs):
+def oneToOneSequences(ff):
     """
     Given a fasta file of an orthogroup, checks whether it is one to one.
     This means that the same number of sequences exist per species (this
     could mean two human and two chimp sequences, but not two human and 
     three chimp sequences. Returns True/False if the set is/isn't 1-1
     """
+    sequences = ff.getAllSequences()
+    speciesIDs = ff.getAllSpeciesIDs()
+
     seqsBySpecies = {}
     for i in range(len(sequences)):
         if speciesIDs[i] in seqsBySpecies:
@@ -106,14 +109,47 @@ def oneToOneSequences(sequences, speciesIDs):
 
     return True
 
-def oneToOneDomains(sequences, hmmfile):
-    #finds all domains occurences in each sequence
-    domains = []
-    for seq in sequences:
-        domains.append(findDomains(seq, hmmfile)[2])
-
+def oneToOneDomains(ff):
+    domains = [ff.getDomains(i) for i in ff.length()]
     firstlen = len(domains[0])
 
+    for line in domains:
+        if len(line) != firstlen:
+            return False
+    
+    return True
+
+def selfSimilarity(sequence, hmmfile, heatmap=False):
+    """
+    Given a single sequence, checks the level of self similarity between 
+    its constituent domains. Optionally creates a heatmap of this similarity
+
+    Args:
+        sequence (str ): An amino acid string representing a protein
+        hmmfile  (str ): File path of the hmm used to find domains
+        heatmap  (bool): (optional, default False) If true, displays a heatmap
+                         of self similarity between domains on the sequence
+
+    Output:
+        simMatrix (list): A 
+    """
+    domains = findDomains(sequence, hmmfile)[2]
+    numDomains = len(domains)
+    simMatrix = np.zeros((numDomains, numDomains))
+
+    for i in range(numDomains):
+        for j in range(i, numDomains):
+            simMatrix[i][j] = domainSim(domains[i], domains[j])
+            simMatrix[j][i] = simMatrix[i][j]
+
+    if heatmap:
+        sns.heatmap(simMatrix)
+        plt.show()
+
+    return simMatrix
+
+def averageSimilarity(ff):
+    domains = ff.getAllDomains
 
 if __name__ == "__main__":
     data = ConfigParser.ORTHOGROUP_PATH #pylint: disable=no-member
