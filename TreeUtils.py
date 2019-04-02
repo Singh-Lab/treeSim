@@ -170,7 +170,7 @@ def printDomSeq(sequence, hmmfile):
     NORMAL = '\033[0m'
 
     #Find domains, check if sequence begins and/or ends with a domain
-    starts, ends, domains = findDomains(sequence, hmmfile)
+    domains = findDomains(sequence, hmmfile)[2]
 
     #split on all domains
     for domain in domains:
