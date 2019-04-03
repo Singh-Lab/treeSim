@@ -1,6 +1,7 @@
 #Performs basic sequence evolution on a single domain.
 #Only performs substitutions, ignoring indels
 
+from ete3 import Tree
 import numpy as np
 from TreeUtils import findDomains, isValid
 from stats import exp, drawFromDiscrete
@@ -63,7 +64,18 @@ alphabet = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q'
                 'T', 'V', 'W', 'Y']
 
 #Performs evolutionary process on a domain according to its hmm. Currently assumes zf_shilpa
-def evolveDomain(sequence, rate, branchLength, emissionProbabilities):
+def evolveDomain(sequence, rate, branchLength, emissionProbs):
+    """
+    Performs evolutionary process on a domain according to its hmm. Currently assumes zf_shilpa
+
+    Args:
+        sequence (str ):       The domain sequence to be evolved
+        rate (float):          rate at which mutations occur
+        branchLength (float):  distance to evolve sequence
+        emissionsProbs (list): matrix with dimensions (n x 20) where n is the length of 
+                               the domain. Each row contains the probability of each 
+                               aa appearing at that position (in pfam hmm order)
+    """
 
     invalid = True
     
@@ -76,10 +88,11 @@ def evolveDomain(sequence, rate, branchLength, emissionProbabilities):
             t -= exp(rate)
         return count
 
+    #information content of a probability distribution
     def ic(line):
         return [-1 * p * log(p) for p in line]
 
-    ics = [sum(ic(i)) for i in emissionProbabilities]
+    ics = [sum(ic(i)) for i in emissionProbs]
     ics = ics / sum(ics)
         
     nMuts = numMutations(branchLength)
@@ -87,7 +100,7 @@ def evolveDomain(sequence, rate, branchLength, emissionProbabilities):
         seqCopy = sequence
         for i in range(nMuts):
             position = drawFromDiscrete(ics)
-            character = drawFromDiscrete(emissionProbabilities[position])
+            character = drawFromDiscrete(emissionProbs[position])
             seqCopy = seqCopy[:position] + alphabet[character] + seqCopy[position+1:]
         invalid = not isValid(seqCopy)
 
@@ -101,7 +114,8 @@ def evolveLinker(sequence, branchLength):
     """
     m = Model("JTT")
     p = Partition(models = m, root_sequence = sequence)
-    t = read_tree(tree = "(A:" + str(branchLength) + ",B:" + str(branchLength) + ");") #(A:BL,b:BL)
+    #t = (A:BL,b:BL)
+    t = read_tree(tree = "(A:" + str(branchLength) + ",B:" + str(branchLength) + ");") 
     e = Evolver(partitions=p, tree=t)
     e()
     return e.get_sequences()["A"]
@@ -113,9 +127,16 @@ def evolveEmptyLinker(branchLength):
 
 #Simulates evolution of a full sequence including both domains and linker regions
 #Splits sequence into domain and linker regions, deals with each independently
-def evolveSequence(sequence, rate, branchLength, emissionProbabilities, hmmfile):
+def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile):
     """
-    TODO: Fill in this comment.
+    Putting the previous steps together, simulates evolutoin of a full sequence including 
+    both domains and non-domain sequence. 
+
+    Args:
+        sequence (str): The full sequence to be evolved
+        emissionsProbs: matrix with dimensions (n x 20) where n is the length of 
+                        the domain. Each row contains the probability of each 
+                        aa appearing at that position (in pfam hmm order) 
     """
 
     #Find domains, check if sequence begins and/or ends with a domain
@@ -128,7 +149,7 @@ def evolveSequence(sequence, rate, branchLength, emissionProbabilities, hmmfile)
 
     #Evolve sequence fragments individually
     for i in range(len(domains)):
-        domains[i] = evolveDomain(domains[i], rate, branchLength, emissionProbabilities)
+        domains[i] = evolveDomain(domains[i], rate, branchLength, emissionProbs)
 
     for i in range(len(sequences)):
         if sequences[i] == '':
@@ -144,3 +165,150 @@ def evolveSequence(sequence, rate, branchLength, emissionProbabilities, hmmfile)
     sequence += sequences[-1] if len(sequences) > len(domains) else domains[-1]
 
     return sequence
+
+#TODO: Need a better name for this function
+def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
+    """
+    Evolves sequence along domain subtree within a single host node. Assumes that every
+    node in the domain tree has an event assigned. Requires that every root has a position
+    and the root sequence has the correct number of domains (matches the tree)
+
+    Args:
+        
+    """
+    #TODO:Why is this here?
+    if len(tree.children) == 1:
+        tree = tree.children[0]
+
+    for node in tree.traverse():
+        if 'position' not in node.features:
+            node.add_feature('position', -1)
+        node.add_feature('domain', '')
+
+    starts, ends, seqs = findDomains(sequence, hmmfile)
+
+    if len(starts) == 1:
+        tree.position = 0
+        tree.domain = seqs[0]
+        workingSet = {tree}
+    
+        #Each job is a (dist, node) pair detailing the remaining branch length 
+        #until a duplication occurs at that node
+        jobs = [[tree.dist, tree]]
+        
+    else:
+        jobs = []
+        workingSet = set()
+        #print hnodename, (len(tree.children), len(seqs))
+        for child in tree.children:
+            child.domain = seqs[child.position]
+            jobs.append([child.dist, child])
+            workingSet.add(child)
+
+    while len(jobs) != 0:
+        jobs.sort()
+        dist, node = jobs.pop(0)
+        workingSet.remove(node)
+        if dist > 0:
+            sequence = evolveSequence(sequence, rate, dist, emissionProbs, hmmfile)
+        
+        starts, ends, seqs = findDomains(sequence, hmmfile)
+        node.domain = seqs[node.position]
+        
+        for job in jobs:
+            job[0] -= dist
+
+        #Only need to deal with duplication and loss events explicitly;
+        #speciation and leaf nodes require no work
+        if node.event == 'DUPLICATION':
+            a,b = node.children[0], node.children[1]
+            sequence = duplicate(sequence, hmmfile, node.position)
+            a.position = node.position
+            b.position = node.position + 1
+
+            for otherNode in workingSet:
+                if otherNode.position > node.position:
+                    otherNode.position += 1
+            workingSet.add(a) 
+            workingSet.add(b) 
+            jobs.append([a.dist, a])
+            jobs.append([b.dist, b])
+
+        if node.event == 'LOSS':
+            sequence = remove(sequence, hmmfile, node.position)
+            for otherNode in workingSet:
+                if otherNode.position > node.position:
+                    otherNode.position -= 1
+                    
+    return sequence
+
+def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProbs):
+	"""
+	Evolves a root sequence along an entire host tree, taking into account the domain level 
+	events present in the guest tree (duplication, loss, speciation)
+
+	Args:
+		host (Tree)       : The host tree (ete3 format) inside which the guest tree evolved
+		guest (Tree)      : The guest tree over which to evolve a sequence 
+		reverseMap (dict) : mapping from nodes in the host node -> guest nodes 
+		rootSequence (str): Initial sequence to evolve. Should contain sequence with ONE domain
+		hmmfile (str )    : path to hmmfile used to identify domains
+		emissionProbs     : matrix with dimensions (n x 20) where n is the length of 
+                            the domain. Each row contains the probability of each 
+                            aa appearing at that position (in pfam hmm order) 
+	"""
+
+	for node in host.traverse():
+		node.add_feature('sequence', "")
+
+	for hostNode in host.traverse():
+		tempSequence = rootSequence if hostNode == host else hostNode.up.sequence
+		#No duplication events in this species
+		if hostNode not in reverseMap or len(reverseMap[hostNode]) == 1:
+			hostNode.sequence = evolveSequence(tempSequence, 0.1, hostNode.dist, \
+                                    emissionProbs, hmmfile)
+			if hostNode in reverseMap:
+				gnode = reverseMap[hostNode][0]
+				gnode.add_feature('position', gnode.up.position)
+			"""
+			TODO: The or case does not add a 'position' field to the node, later causing 
+            an exception when the child attempts to look it up at line 340. Two possible fixes:
+			1) gnode = reversemap[hostNode][0]; gnode.add_feature('position', gnode.up.position)
+			2) Remove the or clause? This was added because it fixed some other bug, but it 
+               doesn't cover the case where multiple nodes all don't duplicate anyway, 
+               so what's it fixing?
+			"""
+			continue
+		allGuestNodes = reverseMap[hostNode]
+		allGuestNodesSet = set(allGuestNodes)
+		upAncestors, leafChildren = {}, {}
+
+		#Identify (and disconnect) all root and leaf nodes among the mapped guest nodes
+		for guestNode in allGuestNodes:
+			if guestNode.up not in allGuestNodesSet:
+				upAncestors[guestNode] = guestNode.up
+				#pass positional information on from previous species
+				if guestNode.up != None:
+					guestNode.add_feature('position', guestNode.up.position)
+				guestNode.up = None
+			if guestNode.children != [] and guestNode.children[0] not in allGuestNodesSet:
+				leafChildren[guestNode] = guestNode.children
+				guestNode.children  = []
+
+		#Connect all roots with a pseudoroot with dist 0, feed this tree to domainOrder
+		t = Tree()
+		#print "\n**************** " + hostNode.name + " ****************\n"
+		t.dist = 0
+		t.children = upAncestors.keys()
+		for guestNode in upAncestors.keys():
+			guestNode.up = t
+		
+		#print t.get_ascii(show_internal=True, attributes=['dist'])
+		tempSequence = domainOrder(tempSequence, 0.1, hmmfile, emissionProbs, t, node.name)
+		hostNode.sequence = tempSequence
+				
+		#Reconnect all root and leaf nodes to the rest of the guest tree
+		for node in upAncestors:
+			node.up = upAncestors[node]
+		for node in leafChildren:
+			node.children = leafChildren[node]
