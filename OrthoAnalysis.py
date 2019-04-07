@@ -149,7 +149,7 @@ def selfSimilarity(sequence, hmmfile, heatmap=False):
     return simMatrix
 
 def averageSimilarity(ff):
-    domains = ff.getAllDomains
+    domains = ff.getAllDomains()
 
 if __name__ == "__main__":
     data = ConfigParser.ORTHOGROUP_PATH #pylint: disable=no-member
