@@ -40,7 +40,7 @@ def logN(m, l):
 
     return stats.lognorm(s=l, scale=m).rvs()
 
-def drawFromDiscrete(distribution):
+def drawFromDiscrete(dist):
     """Takes in a pdf of a discrete variable and draws from it u.a.r."""
     pos = np.random.random()
     cumDist = [dist[0]]
