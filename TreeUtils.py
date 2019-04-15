@@ -95,7 +95,7 @@ def s3(x):
 def findDomainsFile(infile, hmmfile):
     #domName = os.popen("grep 'NAME' " + hmmfile).read().split()[1]
     seqName = list(open(infile))[0][1:].strip()
-    os.system("hmmsearch232 -E 0.00001 " + hmmfile + " " + infile 
+    os.system("hmmsearch232 --domE 0.00001 " + hmmfile + " " + infile 
                 + " | grep '^ [ ]*" + seqName + "' > tmp/grepoutput.txt")
     hits = list(open('tmp/grepoutput.txt'))
     starts, ends, seqs = [], [], []

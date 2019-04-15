@@ -119,7 +119,7 @@ def oneToOneDomains(ff):
     
     return True
 
-def selfSimilarity(sequence, hmmfile, heatmap=False):
+def selfSimilarity(name, sequence, hmmfile, heatmap=False):
     """
     Given a single sequence, checks the level of self similarity between 
     its constituent domains. Optionally creates a heatmap of this similarity
@@ -143,13 +143,42 @@ def selfSimilarity(sequence, hmmfile, heatmap=False):
             simMatrix[j][i] = simMatrix[i][j]
 
     if heatmap:
-        sns.heatmap(simMatrix)
-        plt.show()
+        sns.heatmap(simMatrix, cmap='viridis')
+        plt.savefig('tmp/' + name + '.pdf')
+        plt.close()
 
     return simMatrix
 
+def columnSimilarity(sequences, hmmfile):
+    """
+    Groups domains into columns based on msa and computes pairwise similarity
+    within each column
+    
+    Args:
+        sequences (list): raw sequences from an orthogroup to find domains in
+        hmmfile   (str ): path to hmm representation of domain
+
+    Output:
+        A list of avg similarities per column
+    """
+    names = [str(i) for i in range(len(sequences))]
+    g = groupDomains(names, sequences, hmmfile)[0]
+    columns = [0. for i in range(len(g[0]))]
+    for dom in range(len(g[0])):
+        col = [o[dom] for o in g if o[dom] != '']
+        count = 0
+        for i in col:
+            for j in col:
+                columns[dom] += domainSim(i, j)
+                count += 1
+
+        columns[dom] /= count
+
+    return columns
+
 def averageSimilarity(ff):
     domains = ff.getAllDomains()
+
 
 if __name__ == "__main__":
     data = ConfigParser.ORTHOGROUP_PATH #pylint: disable=no-member
