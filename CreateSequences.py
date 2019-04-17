@@ -14,7 +14,7 @@ from pyvolve import Model, Partition, Evolver, read_tree
 #                                   #
 #####################################
 
-def duplicate(sequence, hmmfile, domNumber):
+def duplicate(sequence, hmmfile, domNumber, length):
     """
     Given a sequence and a domain number (ith domain in sequence), duplicates this 
     domain in the sequence.
@@ -28,9 +28,15 @@ def duplicate(sequence, hmmfile, domNumber):
         sequence (str ): The sequence after the specified duplication.	
     """
     BASELINKER = 'TGEVK'
-    ends, domSeqs = findDomains(sequence, hmmfile)[1:]
+    starts, ends = findDomains(sequence, hmmfile)[:2]
+
+    sequence = sequence[:ends[domNumber + length - 1] + 1] + BASELINKER + \
+                    sequence[starts[domNumber]:]
+
+    """
     sequence = sequence[:ends[domNumber]+1] + BASELINKER + \
                     domSeqs[domNumber] + sequence[ends[domNumber]+1:]
+    """
     return sequence
 
 def remove(sequence, hmmfile, domNumber):
@@ -176,7 +182,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
     Args:
         
     """
-    #TODO:Why is this here?
+    #TODO:Why is this here? Can probably remove this and the 'if len(starts) == 1 clause'
     if len(tree.children) == 1:
         tree = tree.children[0]
 
@@ -220,19 +226,33 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
 
         #Only need to deal with duplication and loss events explicitly;
         #speciation and leaf nodes require no work
+        #TODO: Need to check for tandem duplications - what's the point otherwise???
         if node.event == 'DUPLICATION':
-            a,b = node.children[0], node.children[1]
-            sequence = duplicate(sequence, hmmfile, node.position)
-            a.position = node.position
-            b.position = node.position + 1
+
+            #Find all other nodes involved in this tandem duplication, they will be 
+            #marked with the same dupNumber tag
+            td = [(node.position, node)]
+            for i in range(len(jobs)):
+                otherNode = jobs[i][1]
+                if otherNode.event == 'DUPLICATION' and otherNode.dupNumber == node.dupNumber:
+                    td.append((otherNode.position, jobs.pop(i)[1]))
+            td.sort()
+            size = len(td)
+
+            sequence = duplicate(sequence, hmmfile, node.position, size)
+
+            for otherNode in [i[1] for i in td]:
+                a,b = otherNode.children[0], otherNode.children[1]
+                a.position = node.position
+                b.position = node.position + 1
+                workingSet.add(a) 
+                workingSet.add(b) 
+                jobs.append([a.dist, a])
+                jobs.append([b.dist, b])
 
             for otherNode in workingSet:
-                if otherNode.position > node.position:
-                    otherNode.position += 1
-            workingSet.add(a) 
-            workingSet.add(b) 
-            jobs.append([a.dist, a])
-            jobs.append([b.dist, b])
+                if otherNode.position > td[-1][1].position:
+                    otherNode.position += size
 
         if node.event == 'LOSS':
             sequence = remove(sequence, hmmfile, node.position)

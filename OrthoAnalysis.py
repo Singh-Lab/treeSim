@@ -11,8 +11,8 @@ from Fasta import FastaFile
 
 def groupDomains(names, sequences, hmmfile):
     """
-    Takes a list of input sequences and returns a list of domain strings for each.
-    Leaves an empty string at position i of the jth list if the jth sequence does 
+    Takes a list of input sequences from an msa and returns a list of domain strings for 
+    each. Leaves an empty string at position i of the jth list if the jth sequence does 
     not have a copy of domain i. This aligns all existing domains and makes it clear
     which domains are present in which sequence
 
