@@ -182,9 +182,11 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
     Args:
         
     """
+    """
     #TODO:Why is this here? Can probably remove this and the 'if len(starts) == 1 clause'
     if len(tree.children) == 1:
         tree = tree.children[0]
+    """
 
     for node in tree.traverse():
         if 'position' not in node.features:
@@ -193,6 +195,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
 
     starts, ends, seqs = findDomains(sequence, hmmfile)
 
+    """
     if len(starts) == 1:
         tree.position = 0
         tree.domain = seqs[0]
@@ -203,22 +206,23 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
         jobs = [[tree.dist, tree]]
         
     else:
-        jobs = []
-        workingSet = set()
-        #print hnodename, (len(tree.children), len(seqs))
-        for child in tree.children:
-            child.domain = seqs[child.position]
-            jobs.append([child.dist, child])
-            workingSet.add(child)
+    """
+    jobs = []
+    workingSet = set()
+    #print hnodename, (len(tree.children), len(seqs))
+    for child in tree.children:
+        child.domain = seqs[child.position]
+        jobs.append([child.dist, child])
+        workingSet.add(child)
 
     while len(jobs) != 0:
+        starts, ends, seqs = findDomains(sequence, hmmfile)
         jobs.sort()
         dist, node = jobs.pop(0)
         workingSet.remove(node)
         if dist > 0:
             sequence = evolveSequence(sequence, rate, dist, emissionProbs, hmmfile)
         
-        starts, ends, seqs = findDomains(sequence, hmmfile)
         node.domain = seqs[node.position]
         
         for job in jobs:
@@ -232,10 +236,11 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
             #Find all other nodes involved in this tandem duplication, they will be 
             #marked with the same dupNumber tag
             td = [(node.position, node)]
+            """             
             for i in range(len(jobs)):
                 otherNode = jobs[i][1]
                 if otherNode.event == 'DUPLICATION' and otherNode.dupNumber == node.dupNumber:
-                    td.append((otherNode.position, jobs.pop(i)[1]))
+                    td.append((otherNode.position, jobs.pop(i)[1])) """
             td.sort()
             size = len(td)
 
@@ -263,72 +268,74 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
     return sequence
 
 def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProbs):
-	"""
-	Evolves a root sequence along an entire host tree, taking into account the domain level 
-	events present in the guest tree (duplication, loss, speciation)
+    """
+    Evolves a root sequence along an entire host tree, taking into account the domain level 
+    events present in the guest tree (duplication, loss, speciation)
 
-	Args:
-		host (Tree)       : The host tree (ete3 format) inside which the guest tree evolved
-		guest (Tree)      : The guest tree over which to evolve a sequence 
-		reverseMap (dict) : mapping from nodes in the host node -> guest nodes 
-		rootSequence (str): Initial sequence to evolve. Should contain sequence with ONE domain
-		hmmfile (str )    : path to hmmfile used to identify domains
-		emissionProbs     : matrix with dimensions (n x 20) where n is the length of 
+    Args:
+        host (Tree)       : The host tree (ete3 format) inside which the guest tree evolved
+        guest (Tree)      : The guest tree over which to evolve a sequence 
+        reverseMap (dict) : mapping from nodes in the host node -> guest nodes 
+        rootSequence (str): Initial sequence to evolve. Should contain sequence with ONE domain
+        hmmfile (str )    : path to hmmfile used to identify domains
+        emissionProbs     : matrix with dimensions (n x 20) where n is the length of 
                             the domain. Each row contains the probability of each 
                             aa appearing at that position (in pfam hmm order) 
-	"""
+    """
 
-	for node in host.traverse():
-		node.add_feature('sequence', "")
+    guest.add_feature('position', 0)
 
-	for hostNode in host.traverse():
-		tempSequence = rootSequence if hostNode == host else hostNode.up.sequence
-		#No duplication events in this species
-		if hostNode not in reverseMap or len(reverseMap[hostNode]) == 1:
-			hostNode.sequence = evolveSequence(tempSequence, 0.1, hostNode.dist, \
+    for node in host.traverse():
+        node.add_feature('sequence', "")
+
+    for hostNode in host.traverse():
+        tempSequence = rootSequence if hostNode == host else hostNode.up.sequence
+        #No duplication events in this species
+        if hostNode not in reverseMap or len(reverseMap[hostNode]) == 1:
+            hostNode.sequence = evolveSequence(tempSequence, 0.1, hostNode.dist, \
                                     emissionProbs, hmmfile)
-			if hostNode in reverseMap:
-				gnode = reverseMap[hostNode][0]
-				gnode.add_feature('position', gnode.up.position)
-			"""
-			TODO: The or case does not add a 'position' field to the node, later causing 
+            if hostNode in reverseMap:
+                gnode = reverseMap[hostNode][0]
+                gnode.add_feature('position', gnode.up.position)
+            """
+            TODO: The or case does not add a 'position' field to the node, later causing 
             an exception when the child attempts to look it up at line 340. Two possible fixes:
-			1) gnode = reversemap[hostNode][0]; gnode.add_feature('position', gnode.up.position)
-			2) Remove the or clause? This was added because it fixed some other bug, but it 
+            1) gnode = reversemap[hostNode][0]; gnode.add_feature('position', gnode.up.position)
+            2) Remove the or clause? This was added because it fixed some other bug, but it 
                doesn't cover the case where multiple nodes all don't duplicate anyway, 
                so what's it fixing?
-			"""
-			continue
-		allGuestNodes = reverseMap[hostNode]
-		allGuestNodesSet = set(allGuestNodes)
-		upAncestors, leafChildren = {}, {}
+            """
+            continue
+        allGuestNodes = reverseMap[hostNode]
+        allGuestNodesSet = set(allGuestNodes)
+        upAncestors, leafChildren = {}, {}
 
-		#Identify (and disconnect) all root and leaf nodes among the mapped guest nodes
-		for guestNode in allGuestNodes:
-			if guestNode.up not in allGuestNodesSet:
-				upAncestors[guestNode] = guestNode.up
-				#pass positional information on from previous species
-				if guestNode.up != None:
-					guestNode.add_feature('position', guestNode.up.position)
-				guestNode.up = None
-			if guestNode.children != [] and guestNode.children[0] not in allGuestNodesSet:
-				leafChildren[guestNode] = guestNode.children
-				guestNode.children  = []
+        #Identify (and disconnect) all root and leaf nodes among the mapped guest nodes
+        for guestNode in allGuestNodes:
+            if guestNode.up not in allGuestNodesSet:
+                upAncestors[guestNode] = guestNode.up
+                #pass positional information on from previous species
+                if guestNode.up != None:
+                    guestNode.add_feature('position', guestNode.up.position)
+                guestNode.up = None
+            if guestNode.children != [] and guestNode.children[0] not in allGuestNodesSet:
+                leafChildren[guestNode] = guestNode.children
+                guestNode.children  = []
 
-		#Connect all roots with a pseudoroot with dist 0, feed this tree to domainOrder
-		t = Tree()
-		#print "\n**************** " + hostNode.name + " ****************\n"
-		t.dist = 0
-		t.children = upAncestors.keys()
-		for guestNode in upAncestors.keys():
-			guestNode.up = t
-		
-		#print t.get_ascii(show_internal=True, attributes=['dist'])
-		tempSequence = domainOrder(tempSequence, 0.1, hmmfile, emissionProbs, t, node.name)
-		hostNode.sequence = tempSequence
-				
-		#Reconnect all root and leaf nodes to the rest of the guest tree
-		for node in upAncestors:
-			node.up = upAncestors[node]
-		for node in leafChildren:
-			node.children = leafChildren[node]
+        #Connect all roots with a pseudoroot with dist 0, feed this tree to domainOrder
+        t = Tree()
+        #print "\n**************** " + hostNode.name + " ****************\n"
+        t.dist = 0
+        t.children = upAncestors.keys()
+        for guestNode in upAncestors.keys():
+            guestNode.up = t
+        
+        #print t.get_ascii(show_internal=True, attributes=['dist'])
+        tempSequence = domainOrder(tempSequence, 0.1, hmmfile, emissionProbs, t, node.name)
+        hostNode.sequence = tempSequence
+                
+        #Reconnect all root and leaf nodes to the rest of the guest tree
+        for node in upAncestors:
+            node.up = upAncestors[node]
+        for node in leafChildren:
+            node.children = leafChildren[node]

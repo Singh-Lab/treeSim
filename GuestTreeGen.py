@@ -29,8 +29,11 @@ def createTree(n):
     tree.populate(n)
 
     i = 0
+    dupNumber = 100000
     for node in tree.traverse():
         node.add_feature('event', 'DUPLICATION')
+        node.add_feature('dupNumber', dupNumber)
+        dupNumber += 1
         node.name = "G0_" + str(i)
         i += 1
 
@@ -109,7 +112,6 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
         branchLength (float): 
     """
     domCounter = 0 #if hostName is given, names of dom nodes will be 'hostName_domCounter'
-    dupNumber = -1 #name for duplication number
     leaves = [leaf for leaf in startingTree]
     for leaf in leaves:
         leaf.add_feature('bl', branchLength)
@@ -129,7 +131,7 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
             numDomains = len(leaves)
             size = dupfunc(1, len(leaves))
             start = np.random.randint(numDomains - size + 1)
-            dupNumber += 1
+            dupNumber = randint(1,99999)
 
             for i in range(start, start+size):
                 node = leaves[i]
