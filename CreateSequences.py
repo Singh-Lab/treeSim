@@ -3,7 +3,7 @@
 
 from ete3 import Tree
 import numpy as np
-from TreeUtils import findDomains, isValid
+from TreeUtils import findDomains, isValid, printDomSeq
 from stats import exp, drawFromDiscrete
 from math import log
 from pyvolve import Model, Partition, Evolver, read_tree
@@ -110,6 +110,7 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs):
             seqCopy = seqCopy[:position] + alphabet[character] + seqCopy[position+1:]
         invalid = not isValid(seqCopy)
 
+    assert(isValid(seqCopy))
     return seqCopy
 
 def evolveLinker(sequence, branchLength):
@@ -182,89 +183,78 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
     Args:
         
     """
-    """
-    #TODO:Why is this here? Can probably remove this and the 'if len(starts) == 1 clause'
-    if len(tree.children) == 1:
-        tree = tree.children[0]
-    """
-
-    for node in tree.traverse():
-        if 'position' not in node.features:
-            node.add_feature('position', -1)
-        node.add_feature('domain', '')
-
     starts, ends, seqs = findDomains(sequence, hmmfile)
 
-    """
-    if len(starts) == 1:
-        tree.position = 0
-        tree.domain = seqs[0]
-        workingSet = {tree}
-    
-        #Each job is a (dist, node) pair detailing the remaining branch length 
-        #until a duplication occurs at that node
-        jobs = [[tree.dist, tree]]
-        
-    else:
-    """
     jobs = []
     workingSet = set()
-    #print hnodename, (len(tree.children), len(seqs))
+
+    #Assumes that the root node given is a dummy node
+    #Also assumes that all children of the fake root have a 'position' field
     for child in tree.children:
-        child.domain = seqs[child.position]
+        #child.domain = seqs[child.position]
         jobs.append([child.dist, child])
         workingSet.add(child)
 
+    #process these roots one at a time
     while len(jobs) != 0:
         starts, ends, seqs = findDomains(sequence, hmmfile)
-        jobs.sort()
+        jobs.sort() #sorts jobs by distance from the root
         dist, node = jobs.pop(0)
         workingSet.remove(node)
         if dist > 0:
             sequence = evolveSequence(sequence, rate, dist, emissionProbs, hmmfile)
-        
-        node.domain = seqs[node.position]
-        
+
+        #node.domain = seqs[node.position]
+
         for job in jobs:
             job[0] -= dist
 
         #Only need to deal with duplication and loss events explicitly;
         #speciation and leaf nodes require no work
-        #TODO: Need to check for tandem duplications - what's the point otherwise???
         if node.event == 'DUPLICATION':
 
-            #Find all other nodes involved in this tandem duplication, they will be 
-            #marked with the same dupNumber tag
+            #Find all other nodes marked in the same tandem duplication
             td = [(node.position, node)]
-            """             
-            for i in range(len(jobs)):
+            for i in range(0, len(jobs), -1):
                 otherNode = jobs[i][1]
                 if otherNode.event == 'DUPLICATION' and otherNode.dupNumber == node.dupNumber:
-                    td.append((otherNode.position, jobs.pop(i)[1])) """
+                    td.append((otherNode.position, jobs.pop(i)[1]))
+
             td.sort()
             size = len(td)
 
             sequence = duplicate(sequence, hmmfile, node.position, size)
 
+            #increment position of all the succeeding domains
+            for otherNode in workingSet:
+                if otherNode.position > td[-1][1].position:
+                    #should already have a position feature, if not there is a problem
+                    otherNode.position += size 
+
+            #add position to children
             for otherNode in [i[1] for i in td]:
-                a,b = otherNode.children[0], otherNode.children[1]
-                a.position = node.position
-                b.position = node.position + 1
-                workingSet.add(a) 
-                workingSet.add(b) 
+                a,b = otherNode.children
+                a.add_feature('position', node.position)
+                b.add_feature('position', node.position + size)
+                workingSet.add(a)
+                workingSet.add(b)
                 jobs.append([a.dist, a])
                 jobs.append([b.dist, b])
 
-            for otherNode in workingSet:
-                if otherNode.position > td[-1][1].position:
-                    otherNode.position += size
+            #print 'DUPLICATION, size ' + str(size) + ' ,now ' + str(len(starts) + size) + ' domains'
+            #printDomSeq(sequence, hmmfile)
+            #print tree.get_ascii(attributes=['position'])
 
         if node.event == 'LOSS':
             sequence = remove(sequence, hmmfile, node.position)
             for otherNode in workingSet:
-                if otherNode.position > node.position:
+                if otherNode.position >= node.position: #Why does this have to be >= instead of > ?
                     otherNode.position -= 1
                     
+            #print 'LOSS at ' + str(node.position) + ' ,now ' + str(len(starts) - 1) + ' domains'
+            #printDomSeq(sequence, hmmfile)
+            #print tree.get_ascii(attributes=['position'])
+
     return sequence
 
 def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProbs):
@@ -283,57 +273,47 @@ def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProb
                             aa appearing at that position (in pfam hmm order) 
     """
 
-    guest.add_feature('position', 0)
-
     for node in host.traverse():
         node.add_feature('sequence', "")
 
     for hostNode in host.traverse():
         tempSequence = rootSequence if hostNode == host else hostNode.up.sequence
-        #No duplication events in this species
-        if hostNode not in reverseMap or len(reverseMap[hostNode]) == 1:
+
+        #No events occured at this node
+        if hostNode not in reverseMap:
             hostNode.sequence = evolveSequence(tempSequence, 0.1, hostNode.dist, \
                                     emissionProbs, hmmfile)
-            if hostNode in reverseMap:
-                gnode = reverseMap[hostNode][0]
-                gnode.add_feature('position', gnode.up.position)
-            """
-            TODO: The or case does not add a 'position' field to the node, later causing 
-            an exception when the child attempts to look it up at line 340. Two possible fixes:
-            1) gnode = reversemap[hostNode][0]; gnode.add_feature('position', gnode.up.position)
-            2) Remove the or clause? This was added because it fixed some other bug, but it 
-               doesn't cover the case where multiple nodes all don't duplicate anyway, 
-               so what's it fixing?
-            """
             continue
+
         allGuestNodes = reverseMap[hostNode]
         allGuestNodesSet = set(allGuestNodes)
         upAncestors, leafChildren = {}, {}
 
-        #Identify (and disconnect) all root and leaf nodes among the mapped guest nodes
         for guestNode in allGuestNodes:
             if guestNode.up not in allGuestNodesSet:
                 upAncestors[guestNode] = guestNode.up
-                #pass positional information on from previous species
+                #pass positional information on from the previous species
                 if guestNode.up != None:
                     guestNode.add_feature('position', guestNode.up.position)
                 guestNode.up = None
             if guestNode.children != [] and guestNode.children[0] not in allGuestNodesSet:
                 leafChildren[guestNode] = guestNode.children
-                guestNode.children  = []
+                guestNode.children = []
 
-        #Connect all roots with a pseudoroot with dist 0, feed this tree to domainOrder
-        t = Tree()
-        #print "\n**************** " + hostNode.name + " ****************\n"
-        t.dist = 0
-        t.children = upAncestors.keys()
-        for guestNode in upAncestors.keys():
-            guestNode.up = t
-        
-        #print t.get_ascii(show_internal=True, attributes=['dist'])
-        tempSequence = domainOrder(tempSequence, 0.1, hmmfile, emissionProbs, t, node.name)
+        if hostNode != host:
+            t = Tree()
+            t.dist = 0
+            t.children = upAncestors.keys()
+            for guestNode in upAncestors.keys():
+                guestNode.up = t
+
+        else:
+            t = guest
+
+        #Actually do the work
+        tempSequence = domainOrder(tempSequence, 0.1, hmmfile, emissionProbs, t, hostNode.name)
         hostNode.sequence = tempSequence
-                
+
         #Reconnect all root and leaf nodes to the rest of the guest tree
         for node in upAncestors:
             node.up = upAncestors[node]

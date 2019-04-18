@@ -1,12 +1,14 @@
 #Draws from an orthogroup, creates a root sequence with desired properties
 
-from CreateSequences import findDomains
+from TreeUtils import findDomains
+from TreeUtils import printDomSeq as pds
 from os import listdir as ls
 from numpy.random import choice
-from TreeUtils import printDomSeq as pds
+from ConfigParser import ConfigParser as CP
+import string
 
-DATAPATH = '/home/caluru/Data/eutheria/'
-hmmfile = '/home/caluru/Data/hmmfiles/zf_shilpa_232.hmm'
+DATAPATH = CP.ORTHOGROUP_PATH #pylint: disable=no-member
+hmmfile = CP.HMM_PATH #pylint: disable=no-member
 
 def genRandomSequence(numDoms):
     """
@@ -34,7 +36,11 @@ def genRandomSequence(numDoms):
     middle += choice(seqs)
 
     newSeq = prefix + middle + suffix
-    return ''.join(newSeq.split('-'))
+    newSeq = ''.join(newSeq.split('-'))
+    #Deletes all lowercase letters
+    newSeq = newSeq.translate(None, string.ascii_lowercase)
+
+    return newSeq
 
 def genRandomSequence2(numDoms):
     """
@@ -62,7 +68,10 @@ def genRandomSequence2(numDoms):
         middle += sequence[i:j]
 
     newSeq = prefix + middle + suffix
-    return ''.join(newSeq.split('-'))
+    newSeq = ''.join(newSeq.split('-'))
+    newSeq = newSeq.translate(None, string.ascii_lowercase)
+
+    return newSeq
 
 if __name__ == '__main__':
     print

@@ -24,25 +24,16 @@ def createNode():
     return node
 
 def createTree(n):
-    """Creates a starter domain tree with n leaves"""
     tree = Tree()
-    tree.populate(n)
 
-    i = 0
-    dupNumber = 100000
-    for node in tree.traverse():
-        node.add_feature('event', 'DUPLICATION')
-        node.add_feature('dupNumber', dupNumber)
-        dupNumber += 1
+    for i in range(n):
+        node = createNode()
+        node.add_feature('position', i)
+        node.pos = i
         node.name = "G0_" + str(i)
-        i += 1
+        tree.children.append(node)
+        node.up = tree
 
-    i = 0
-    for leaf in tree:
-        leaf.add_feature('pos', i)
-        i += 1
-        leaf.add_feature('event', 'SPECIATION')
-        leaf.dist = 0
     return tree
 
 def addcherry(node, hostName = '', domCounter = 0):
@@ -238,6 +229,6 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
 
             for i in range(len(treepositions)):
                 gleaves[treepositions[i]].add_child(newTrees[i])
-    
-    clean(host, guest)
+
+    #clean(host, guest) #Only add this back in when clean problems are solved
     return guest, nodemap
