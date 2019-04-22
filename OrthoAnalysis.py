@@ -144,7 +144,8 @@ def selfSimilarity(name, sequence, hmmfile, heatmap=False):
 
     if heatmap:
         sns.heatmap(simMatrix, cmap='viridis')
-        plt.savefig('tmp/' + name + '.pdf')
+        #plt.savefig('tmp/' + name + '.pdf')
+        plt.show()
         plt.close()
 
     return simMatrix

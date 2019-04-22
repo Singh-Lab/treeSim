@@ -5,6 +5,7 @@ from TreeUtils import printDomSeq as pds
 from os import listdir as ls
 from numpy.random import choice
 from ConfigParser import ConfigParser as CP
+from OrthoAnalysis import selfSimilarity
 import string
 
 DATAPATH = CP.ORTHOGROUP_PATH #pylint: disable=no-member
@@ -48,16 +49,25 @@ def genRandomSequence2(numDoms):
     Picks 1 domain per sequence, one sequence per orthogroup
     """
     files = ls(DATAPATH)
+    for i in range(len(files))[::-1]:
+        if '.fa' not in files[i]:
+            files.pop(i)
     pool = []
-    for _ in range(numDoms):
+    i = 0
+    while i < numDoms:
         f = list(open(DATAPATH + choice(files)))[1::2]
-        pool.append(choice(f).strip())
+        f = choice(f).strip()
+        if len(findDomains(f, hmmfile)[0]) > 1:
+            pool.append(string.translate(f, None, '-'))
+            i += 1
 
     starts, ends = findDomains(pool[0], hmmfile)[:2]
     prefix = pool[0][:starts[0]]
     suffix = pool[0][ends[-1]:]
+    if len(findDomains(prefix, hmmfile)[0]) != 0 or len(findDomains(prefix, hmmfile)[0]) != 0:
+        print 'WAH'
     if prefix == '' or suffix == '':
-        return genRandomSequence(numDoms)
+        return genRandomSequence2(numDoms)
 
     i,j = starts[0], starts[1]
     middle = pool[0][i:j]
@@ -67,12 +77,20 @@ def genRandomSequence2(numDoms):
         i, j = starts[0], starts[1]
         middle += sequence[i:j]
 
+    if len(findDomains(middle, hmmfile)[0]) > 5:
+        print 'WAHWAH'
+
     newSeq = prefix + middle + suffix
-    newSeq = ''.join(newSeq.split('-'))
+    if len(findDomains(newSeq, hmmfile)[0]) > 5:
+        print 'TRIPLE WAH'
+    newSeq = newSeq.translate(None, '-') #''.join(newSeq.split('-'))
     newSeq = newSeq.translate(None, string.ascii_lowercase)
 
     return newSeq
 
 if __name__ == '__main__':
-    print
-    pds(genRandomSequence(5), hmmfile)
+    for i in range(10):
+        print
+        s = genRandomSequence2(5)
+        pds(s, hmmfile)
+        selfSimilarity('d', s, hmmfile, True)

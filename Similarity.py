@@ -25,6 +25,9 @@ def domainSim(a,b):
     Both must be length 23. Uses the PAM matrix
     """
 
+    a = a.upper()
+    b = b.upper()
+
     def simHelper(a,b):
         similarity = 0
         #Only works for zinc fingers

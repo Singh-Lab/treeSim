@@ -231,4 +231,10 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
                 gleaves[treepositions[i]].add_child(newTrees[i])
 
     #clean(host, guest) #Only add this back in when clean problems are solved
+
+    #for debugging purposes only
+    for node in guest:
+        if 'dupNumber' not in node.features:
+            node.add_feature('dupNumber', -1)
+
     return guest, nodemap

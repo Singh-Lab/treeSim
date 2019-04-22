@@ -7,6 +7,7 @@ from TreeUtils import findDomains, isValid, printDomSeq
 from stats import exp, drawFromDiscrete
 from math import log
 from pyvolve import Model, Partition, Evolver, read_tree
+from OrthoAnalysis import selfSimilarity
 
 #####################################
 #                                   #
@@ -213,9 +214,11 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
         #speciation and leaf nodes require no work
         if node.event == 'DUPLICATION':
 
+            print [(thing[1].name, thing[1].dupNumber) for thing in jobs]
+
             #Find all other nodes marked in the same tandem duplication
             td = [(node.position, node)]
-            for i in range(0, len(jobs), -1):
+            for i in range(len(jobs) - 1, -1, -1):
                 otherNode = jobs[i][1]
                 if otherNode.event == 'DUPLICATION' and otherNode.dupNumber == node.dupNumber:
                     td.append((otherNode.position, jobs.pop(i)[1]))
@@ -241,8 +244,8 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
                 jobs.append([a.dist, a])
                 jobs.append([b.dist, b])
 
-            #print 'DUPLICATION, size ' + str(size) + ' ,now ' + str(len(starts) + size) + ' domains'
-            #printDomSeq(sequence, hmmfile)
+            print 'DUPLICATION, size ' + str(size) + ' ,now ' + str(len(starts) + size) + ' domains'
+            printDomSeq(sequence, hmmfile)
             #print tree.get_ascii(attributes=['position'])
 
         if node.event == 'LOSS':
@@ -251,9 +254,11 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
                 if otherNode.position >= node.position: #Why does this have to be >= instead of > ?
                     otherNode.position -= 1
                     
-            #print 'LOSS at ' + str(node.position) + ' ,now ' + str(len(starts) - 1) + ' domains'
-            #printDomSeq(sequence, hmmfile)
+            print 'LOSS at ' + str(node.position) + ' ,now ' + str(len(starts) - 1) + ' domains'
+            printDomSeq(sequence, hmmfile)
             #print tree.get_ascii(attributes=['position'])
+
+        selfSimilarity(hnodename, sequence, hmmfile, True)
 
     return sequence
 
