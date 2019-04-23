@@ -29,26 +29,26 @@ def prune(tree, domNames):
     for leaf in tree:
         if leaf.name not in domNames:
             delete.append(leaf)
-    print 'starting delete', delete
 
     #Sweep
     while delete != []:
-        print 'delete', [a.name for a in delete]
         leaf = delete.pop(0)
         if leaf.children == []:
             parent = leaf.up
-            delete.append(parent)
+            if parent not in delete:
+                delete.append(parent)
             parent.children.remove(leaf)
             leaf.up = None
         else: #only one child
             if leaf == tree:
-                leaf = leaf.children[0]
+                tree = leaf.children[0]
+                tree.up = None
+                continue
             leaf.up.children.remove(leaf)
             leaf.up.children.append(leaf.children[0])
             leaf.children[0].up = leaf.up
             leaf.up = None
             leaf.children = []
-        print tree
 
     return tree
 
@@ -183,18 +183,33 @@ def createOrthoTree(hostTree, names, sequences, filename):
 
 if __name__ == '__main__':
     #Test Pruning
-    t = Tree('test.nwk')
-    #t.populate(10)
-    print t
-    """
-    keep = [leaf.name for leaf in t]
-    np.random.shuffle(keep)
-    keep = keep[:7]
-    """
-    keep = ['E', 'G', 'D', 'J', 'H', 'F', 'C']
-    print keep
-    print prune(t, keep)
+    if False:
+        t = Tree()
+        t.populate(10)
 
+        print t.get_ascii()
+        
+        keep = [leaf.name for leaf in t]
+        np.random.shuffle(keep)
+        keep = keep[:7]
+
+        #keep = ['A','B','C','D','G','H','J']
+        
+        i = 1
+        for node in t.traverse():
+            if node.name == '':
+                node.name = str(i)
+                i += 1
+        
+        print keep
+        print prune(t, keep)
+
+    #Test split by clade
+    if True:
+        t = Tree('test.nwk')
+        print t
+
+        
 
 
 
