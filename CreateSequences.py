@@ -111,7 +111,7 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs):
             seqCopy = seqCopy[:position] + alphabet[character] + seqCopy[position+1:]
         invalid = not isValid(seqCopy)
 
-    assert(isValid(seqCopy))
+    #assert(isValid(seqCopy))
     return seqCopy
 
 def evolveLinker(sequence, branchLength):

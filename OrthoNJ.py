@@ -1,6 +1,7 @@
 #Builds a neighbor joining-like tree where starting subtrees are taken from columns
 #and a full tree is constructed from this. Intended as input for iqtree.
 
+from ete3 import Tree
 from OrthoAnalysis import groupDomains
 from TreeUtils import readTree
 from ConfigParser import ConfigParser as CP
@@ -28,21 +29,26 @@ def prune(tree, domNames):
     for leaf in tree:
         if leaf.name not in domNames:
             delete.append(leaf)
+    print 'starting delete', delete
 
     #Sweep
     while delete != []:
-        leaf = delete.pop()
+        print 'delete', [a.name for a in delete]
+        leaf = delete.pop(0)
         if leaf.children == []:
             parent = leaf.up
             delete.append(parent)
-            parent.remove =(leaf)
+            parent.children.remove(leaf)
             leaf.up = None
         else: #only one child
-            leaf.up.children.remove(parent)
+            if leaf == tree:
+                leaf = leaf.children[0]
+            leaf.up.children.remove(leaf)
             leaf.up.children.append(leaf.children[0])
             leaf.children[0].up = leaf.up
             leaf.up = None
-            leaf.children = None
+            leaf.children = []
+        print tree
 
     return tree
 
@@ -174,3 +180,35 @@ def createOrthoTree(hostTree, names, sequences, filename):
         if columnOccupancy(column) > .8:
             subtree = host.copy('newick')
             subtrees.append(fullColumn(subtree, domNames[i]))
+
+if __name__ == '__main__':
+    #Test Pruning
+    t = Tree('test.nwk')
+    #t.populate(10)
+    print t
+    """
+    keep = [leaf.name for leaf in t]
+    np.random.shuffle(keep)
+    keep = keep[:7]
+    """
+    keep = ['E', 'G', 'D', 'J', 'H', 'F', 'C']
+    print keep
+    print prune(t, keep)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
