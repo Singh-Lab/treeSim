@@ -123,41 +123,6 @@ def findDomains(sequence, hmmfile):
     
     return findDomainsFile('tmp/tmp.fa', hmmfile)
 
-#TODO: Change so that it takes one domain per column rather than one domain per column
-def genRandomSequence(numDoms, datapath, hmmfile):
-    """
-    Generates a random zf-C2H2 protein sequence with the given number of domains.
-    Creates sequences using a set of orthogroups (each in fasta format, multiple 
-    sequence alignments allowed)found in the datapath folder.
-
-    Args:
-        numDoms  (int ): The number of domains in the output sequence
-        datapath (str ): the path to the folder containing orthogroups to emulate
-        hmmfile  (str ): path to the hmmfile, in HMMER format
-    """
-    files = os.listdir(datapath)
-    f = list(open(datapath + np.random.choice(files)))[1::2]
-    sequence = np.random.choice(f).strip()
-    
-    starts, ends, seqs = findDomains(sequence, hmmfile)
-    if len(starts) < numDoms:
-        return genRandomSequence(numDoms, datapath, hmmfile)
-    prefix = sequence[:starts[0]]
-    suffix = sequence[ends[-1]:]
-    if prefix == '' or suffix == '':
-        return genRandomSequence(numDoms, datapath, hmmfile)
-    linkers = []
-    for i in range(len(starts)-1):
-        linkers.append(sequence[ends[i]+1:starts[i+1]])
-    
-    middle = ''
-    for _ in range(numDoms - 1):
-        middle += np.random.choice(seqs) + np.random.choice(linkers)
-    middle += np.random.choice(seqs)
-
-    newSeq = prefix + middle + suffix
-    return ''.join(newSeq.split('-'))
-
 def printDomSeq(sequence, hmmfile):
     """
     prints the sequence with domains highlighted in red 

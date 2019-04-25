@@ -98,7 +98,6 @@ def emptyColumn():
     """
     pass
 
-#TODO: Untested
 def splitByClade(hostCopy, domNames, threshold=0.8, mapping=None):
     """
     Works on all cases regardless of column occupancy. Takes a host tree and maps the 
@@ -111,8 +110,8 @@ def splitByClade(hostCopy, domNames, threshold=0.8, mapping=None):
     if mapping is None:
         mapping = {}
         for name in domNames:
-            #Assumes G<n>_XXX format
-            hostName = "H" + name[1:].split("_")[0]
+            #Assumes G_<n>_XXX format
+            hostName = "H_" + name.split("_")[1]
             mapping[name] = hostName
 
     #Step 2: Rename leaves appropriately
@@ -122,18 +121,17 @@ def splitByClade(hostCopy, domNames, threshold=0.8, mapping=None):
         hostNode.name = name
 
     #Step 3: Count occupancy by clade
-    jobs = []
     for leaf in hostCopy:
         leaf.add_feature('clade_size', 1)
         if leaf.name in domNames:
             leaf.add_feature('clade_occupancy', 1)
         else:
             leaf.add_feature('clade_occupancy', 0)
-        if leaf.up not in jobs:
-            jobs.append(leaf.up)
 
-    while jobs != []:
-        node = jobs.pop()
+    jobs = [node for node in hostCopy.traverse()][::-1]
+    for node in jobs:
+        if node.children == []:
+            continue
         a, b = node.children
         node.add_feature('clade_size', a.clade_size + b.clade_size)
         node.add_feature('clade_occupancy', a.clade_occupancy + b.clade_occupancy)
@@ -207,23 +205,18 @@ if __name__ == '__main__':
     #Test split by clade
     if True:
         t = Tree('test.nwk')
-        print t
 
-        
+        i = 1
+        for node in t.traverse():
+            if node.name == '':
+                node.name = "H_" + str(i)
+                i += 1
+            else:
+                node.name = "H_" + node.name
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        print t.get_ascii()
+        keep = ['A','B','C','D','G','H','I','N','O','P']
+        keep = ["G_" + i for i in keep]
+        print keep
+        stuff = splitByClade(t, keep, 10/16.)
+        print [thing.name for thing in stuff]

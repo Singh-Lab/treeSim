@@ -24,8 +24,8 @@ def groupDomains(names, sequences, hmmfile):
 
 
     grouped = [[dom1, dom2, ''  ],
-              [''  , dom2, dom3],
-              [dom1, ''  , dom3]]
+               [''  , dom2, dom3],
+               [dom1, ''  , dom3]]
 
     Args:
         sequences (list): A list of sequences 

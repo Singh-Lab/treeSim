@@ -19,6 +19,7 @@ def genRandomSequence(numDoms):
     files = ls(DATAPATH)
     f = list(open(DATAPATH + choice(files)))[1::2]
     sequence = choice(f).strip()
+    sequence.translate(None, '-')
     
     starts, ends, seqs = findDomains(sequence, hmmfile)
     if len(starts) < numDoms:
@@ -64,8 +65,6 @@ def genRandomSequence2(numDoms):
     starts, ends = findDomains(pool[0], hmmfile)[:2]
     prefix = pool[0][:starts[0]]
     suffix = pool[0][ends[-1]:]
-    if len(findDomains(prefix, hmmfile)[0]) != 0 or len(findDomains(prefix, hmmfile)[0]) != 0:
-        print 'WAH'
     if prefix == '' or suffix == '':
         return genRandomSequence2(numDoms)
 
@@ -77,12 +76,7 @@ def genRandomSequence2(numDoms):
         i, j = starts[0], starts[1]
         middle += sequence[i:j]
 
-    if len(findDomains(middle, hmmfile)[0]) > 5:
-        print 'WAHWAH'
-
     newSeq = prefix + middle + suffix
-    if len(findDomains(newSeq, hmmfile)[0]) > 5:
-        print 'TRIPLE WAH'
     newSeq = newSeq.translate(None, '-') #''.join(newSeq.split('-'))
     newSeq = newSeq.translate(None, string.ascii_lowercase)
 
@@ -92,5 +86,5 @@ if __name__ == '__main__':
     for i in range(10):
         print
         s = genRandomSequence2(5)
-        pds(s, hmmfile)
+        #pds(s, hmmfile)
         selfSimilarity('d', s, hmmfile, True)
