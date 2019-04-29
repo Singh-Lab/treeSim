@@ -6,6 +6,7 @@ from OrthoAnalysis import groupDomains
 from TreeUtils import readTree
 from ConfigParser import ConfigParser as CP
 import numpy as np
+import os
 
 #TODO: Untested
 def columnOccupancy(column):
@@ -174,10 +175,14 @@ def createOrthoTree(hostTree, names, sequences, filename):
     for i in range(len(grouped)):
         column = grouped[i]
         names = domNames[i]
-        #column is mostly present, follow host tree
-        if columnOccupancy(column) > .8:
-            subtree = host.copy('newick')
-            subtrees.append(fullColumn(subtree, domNames[i]))
+        subtrees += splitByClade(host.copy('newick'), domNames)
+
+        #TODO: Finish constructing tree from clades
+
+def mlTree(msafile, treefile):
+    """Runs IQTree on the input file given ("""
+    cmd = "iqtree -s " + msafile + " -t " + treefile
+    os.system(cmd)
 
 if __name__ == '__main__':
     #Test Pruning
@@ -203,7 +208,7 @@ if __name__ == '__main__':
         print prune(t, keep)
 
     #Test split by clade
-    if True:
+    if False:
         t = Tree('test.nwk')
 
         i = 1
@@ -220,3 +225,6 @@ if __name__ == '__main__':
         print keep
         stuff = splitByClade(t, keep, 10/16.)
         print [thing.name for thing in stuff]
+
+    if True:
+        mlTree('testfasta.fa', 'testtree.nwk')

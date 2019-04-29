@@ -258,7 +258,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
             printDomSeq(sequence, hmmfile)
             #print tree.get_ascii(attributes=['position'])
 
-        selfSimilarity(hnodename, sequence, hmmfile, True)
+        #selfSimilarity(hnodename, sequence, hmmfile, True)
 
     return sequence
 

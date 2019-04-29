@@ -72,6 +72,14 @@ def writeMapping(nodemap, filename):
 
     outputHandle.close()
 
+def writeFasta(names, sequences, filename):
+    """Writes out a fasta sequence to a file named <filename>"""
+    f = open(filename, 'w')
+    for i in range(len(names)):
+        f.write(">" + names[i] + '\n')
+        f.write(sequences[i] + '\n')
+    f.close()
+
 #Duplication rate functions for use with guest tree generation
 def s(x):
     """Sigmoid function designed to quickly reduce losses as domains are lost"""
