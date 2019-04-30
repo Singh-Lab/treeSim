@@ -129,8 +129,9 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
                 node.event = "DUPLICATION"
                 node.add_feature('dupNumber', dupNumber)
                 domCounter = addcherry(node, hostName, domCounter)
-                node.children[0].dist = dist
-                node.children[1].dist = dist
+                node.dist = node.bl - branchLength
+                node.children[0].dist = 0
+                node.children[1].dist = 0
                 node.children[0].add_feature('bl', branchLength)                
                 node.children[1].add_feature('bl', branchLength)
 
