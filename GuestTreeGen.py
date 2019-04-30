@@ -6,7 +6,7 @@ from stats import gaussNoise
 from random import randint 
 
 LOSS_CODE = -1
-DUPLICATION_FACTOR = 3
+#DUPLICATION_FACTOR = 3 breaks tandem duplication detection, do this later instead
 
 #####################################
 #                                   #
@@ -130,7 +130,7 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
                 node.add_feature('dupNumber', dupNumber)
                 domCounter = addcherry(node, hostName, domCounter)
                 node.children[0].dist = dist
-                node.children[1].dist = DUPLICATION_FACTOR * dist
+                node.children[1].dist = dist
                 node.children[0].add_feature('bl', branchLength)                
                 node.children[1].add_feature('bl', branchLength)
 

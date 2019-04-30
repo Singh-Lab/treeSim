@@ -110,6 +110,8 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs):
             character = drawFromDiscrete(emissionProbs[position])
             seqCopy = seqCopy[:position] + alphabet[character] + seqCopy[position+1:]
         invalid = not isValid(seqCopy)
+        if invalid:
+            print 'yikes'
 
     #assert(isValid(seqCopy))
     return seqCopy
@@ -214,7 +216,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
         #speciation and leaf nodes require no work
         if node.event == 'DUPLICATION':
 
-            print [(thing[1].name, thing[1].dupNumber) for thing in jobs]
+            print (node.name, node.dupNumber), [(thing[1].name, thing[1].dupNumber) for thing in jobs]
 
             #Find all other nodes marked in the same tandem duplication
             td = [(node.position, node)]
@@ -226,7 +228,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
             td.sort()
             size = len(td)
 
-            sequence = duplicate(sequence, hmmfile, node.position, size)
+            sequence = duplicate(sequence, hmmfile, td[0][1].position, size)
 
             #increment position of all the succeeding domains
             for otherNode in workingSet:
@@ -237,16 +239,17 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
             #add position to children
             for otherNode in [i[1] for i in td]:
                 a,b = otherNode.children
-                a.add_feature('position', node.position)
-                b.add_feature('position', node.position + size)
+                a.add_feature('position', otherNode.position)
+                b.add_feature('position', otherNode.position + size)
                 workingSet.add(a)
                 workingSet.add(b)
                 jobs.append([a.dist, a])
                 jobs.append([b.dist, b])
 
-            print 'DUPLICATION, size ' + str(size) + ' ,now ' + str(len(starts) + size) + ' domains'
+            print 'DUPLICATION, size ' + str(size) + 'at ' + str(td[0][1].position) + \
+                    ' ,now ' + str(len(starts) + size) + ' domains'
             printDomSeq(sequence, hmmfile)
-            #print tree.get_ascii(attributes=['position'])
+            print tree.get_ascii(attributes=['position'])
 
         if node.event == 'LOSS':
             sequence = remove(sequence, hmmfile, node.position)
@@ -256,7 +259,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
                     
             print 'LOSS at ' + str(node.position) + ' ,now ' + str(len(starts) - 1) + ' domains'
             printDomSeq(sequence, hmmfile)
-            #print tree.get_ascii(attributes=['position'])
+            print tree.get_ascii(attributes=['position'])
 
         #selfSimilarity(hnodename, sequence, hmmfile, True)
 

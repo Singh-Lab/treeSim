@@ -15,7 +15,7 @@ def readTree(filename):
 
 def writeTree(tree, filename):
     """Writes an ete3 tree to the given filename in NHX format"""
-    output = tree.write(outfile=filename, format=1, features=[])[:-1]
+    output = tree.write(format=1, features=[])[:-1]
 
     #For whatever reason ete3 doesn't include root name + features, so this adds it on
     output += tree.name + "[&&NHX"
@@ -25,7 +25,7 @@ def writeTree(tree, filename):
 
     outputHandle = open(filename, 'w')
     outputHandle.write(output)
-    outputHandle.cltose()
+    outputHandle.close()
 
 def readMapping(host, guest, mapfile):
     """
@@ -112,9 +112,9 @@ def findDomainsFile(infile, hmmfile):
         line = line.split()
         if not line[1].isdigit():
             continue
-        starts.append(int(line[1]) - 1) #HMMER is 1-indexed :/
+        starts.append(int(line[1]) - 1) #HMMER is 1-indexed :(
         ends.append(int(line[3]) - 1)
-        seqs.append(line[2])
+        seqs.append(line[2].upper())
 
     #HMMER doesn't sort by position in the sequence. This fixes that
     seqs = sortBy(seqs, starts)
@@ -154,7 +154,7 @@ def printDomSeq(sequence, hmmfile):
     out = ''
     for i in range(len(domains)):
         out += sequences[i] + GREEN + domains[i][0] + RED + domains[i][1:] + NORMAL
-    out += sequences[-1] if len(sequences) > len(domains) else RED + domains[-1] + NORMAL
+    out += sequences[-1] #if len(sequences) > len(domains) else RED + domains[-1] + NORMAL
 
     print out
 
