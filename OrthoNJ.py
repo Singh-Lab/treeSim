@@ -184,6 +184,11 @@ def mlTree(msafile, treefile):
     cmd = "iqtree -s " + msafile + " -t " + treefile
     os.system(cmd)
 
+def mlTree2(msafile):
+    """Runs IQTree on the input file given ("""
+    cmd = "iqtree -s " + msafile
+    os.system(cmd)
+
 if __name__ == '__main__':
     #Test Pruning
     if False:

@@ -25,6 +25,7 @@ def createNode():
 
 def createTree(n):
     tree = Tree()
+    tree.dist = 0
 
     for i in range(n):
         node = createNode()

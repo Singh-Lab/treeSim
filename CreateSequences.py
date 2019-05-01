@@ -24,6 +24,7 @@ def duplicate(sequence, hmmfile, domNumber, length):
         sequence: The full gene sequence (including both domain and linker regions)
         hmmfile: hmm file containing hmm of domain to be duplicated
         domNumber: The position of the domain to be duplicated w.r.t. the other domains
+		length: Length (#domains) involved in duplication
 
     Returns:
         sequence (str ): The sequence after the specified duplication.	
@@ -34,10 +35,6 @@ def duplicate(sequence, hmmfile, domNumber, length):
     sequence = sequence[:ends[domNumber + length - 1] + 1] + BASELINKER + \
                     sequence[starts[domNumber]:]
 
-    """
-    sequence = sequence[:ends[domNumber]+1] + BASELINKER + \
-                    domSeqs[domNumber] + sequence[ends[domNumber]+1:]
-    """
     return sequence
 
 def remove(sequence, hmmfile, domNumber):
@@ -205,6 +202,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
         dist, node = jobs.pop(0)
         workingSet.remove(node)
         if dist > 0:
+            print 'evolving for:', dist, '\n'
             sequence = evolveSequence(sequence, rate, dist, emissionProbs, hmmfile)
 
         #node.domain = seqs[node.position]

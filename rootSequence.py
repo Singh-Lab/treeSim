@@ -11,6 +11,7 @@ import string
 DATAPATH = CP.ORTHOGROUP_PATH #pylint: disable=no-member
 hmmfile = CP.HMM_PATH #pylint: disable=no-member
 
+#TODO: Bug causing more domains than required occasionally (grs2 works normally).
 def genRandomSequence(numDoms):
     """
     Generates a random zf-C2H2 protein sequence with the given number of domains.
@@ -83,8 +84,13 @@ def genRandomSequence2(numDoms):
     return newSeq
 
 if __name__ == '__main__':
-    for i in range(10):
-        print
-        s = genRandomSequence2(5)
+    crapcounter = 0
+    for i in range(1000):
+        s = genRandomSequence2(1)
         #pds(s, hmmfile)
-        selfSimilarity('d', s, hmmfile, True)
+        x = selfSimilarity('d', s, hmmfile, False)
+        if len(x) != 1:
+            print 'fuck'
+            crapcounter += 1
+
+    print crapcounter
