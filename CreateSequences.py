@@ -214,7 +214,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
         #speciation and leaf nodes require no work
         if node.event == 'DUPLICATION':
 
-            print (node.name, node.dupNumber), [(thing[1].name, thing[1].dupNumber) for thing in jobs]
+            print (node.name, node.dupNumber), #[(thing[1].name, thing[1].dupNumber) for thing in jobs]
 
             #Find all other nodes marked in the same tandem duplication
             td = [(node.position, node)]

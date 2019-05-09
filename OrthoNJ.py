@@ -179,14 +179,16 @@ def createOrthoTree(hostTree, names, sequences, filename):
 
         #TODO: Finish constructing tree from clades
 
-def mlTree(msafile, treefile):
+def mlTree(msafile, treefile, outgroup=False):
     """Runs IQTree on the input file given ("""
-    cmd = "iqtree -s " + msafile + " -t " + treefile
+    cmd = "iqtree -redo -s " + msafile + " -t " + treefile + " -pre " + msafile
+    if outgroup: cmd += " -o Outgroup"
     os.system(cmd)
 
-def mlTree2(msafile):
+def mlTree2(msafile, outgroup=False):
     """Runs IQTree on the input file given ("""
-    cmd = "iqtree -s " + msafile
+    cmd = "iqtree -redo -s " + msafile + " -pre " + msafile
+    if outgroup: cmd += " -o Outgroup"
     os.system(cmd)
 
 if __name__ == '__main__':

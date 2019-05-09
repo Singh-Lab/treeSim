@@ -72,12 +72,25 @@ def writeMapping(nodemap, filename):
 
     outputHandle.close()
 
-def writeFasta(names, sequences, filename):
-    """Writes out a fasta sequence to a file named <filename>"""
+def writeFasta(names, sequences, filename, outgroup=False):
+    """
+    Writes out a fasta sequence to a file named <filename>. If outgroup is true,
+    creates a fake outgroup (length 23 "AAAAAAAAAAAAAAAAAAAAAAA") and adds as the 
+    last sequence in the fasta file
+    """
     f = open(filename, 'w')
+
+    #TODO: Make sure that this is actually a valid outgroup in all cases (should be)
+    if outgroup:
+        alphabet = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', \
+                        'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
+        fakeseq = ''.join(np.random.choice(alphabet, 23))
+        f.write(">Outgroup\n" + fakeseq + '\n')
+
     for i in range(len(names)):
         f.write(">" + names[i] + '\n')
         f.write(sequences[i] + '\n')
+
     f.close()
 
 #Duplication rate functions for use with guest tree generation
