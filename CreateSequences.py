@@ -341,7 +341,7 @@ if __name__ == '__main__':
     hmmfile = '/home/caluru/Data/hmmfiles/zf_shilpa_232.hmm'
 
     def s2(x):
-        denom = 1 + exp(7-x)
+        denom = 1 + exp(10-x) if x < 10 else 1
         return 1 - .6 / denom
 
     def expfunc(minimum=1, maximum=3):
@@ -351,7 +351,7 @@ if __name__ == '__main__':
     def selfSim(seqs):
         return selfSimilarity('asdf', seqs, hmmfile, False)
 
-    sd = 1 #startingDomains
+    sd = 5 #startingDomains
 
     hostTree = createRandomTopology(1, 1, lambda x: x)
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .2, gaussNoise, sd)
