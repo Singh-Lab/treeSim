@@ -100,6 +100,7 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs):
     ics = ics / sum(ics)
         
     nMuts = numMutations(branchLength)
+    invalidCounter = 0
     while invalid:
         seqCopy = sequence
         for i in range(nMuts):
@@ -107,8 +108,9 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs):
             character = drawFromDiscrete(emissionProbs[position])
             seqCopy = seqCopy[:position] + alphabet[character] + seqCopy[position+1:]
         invalid = not isValid(seqCopy)
-        if invalid:
-            print 'yikes'
+        invalidCounter += 1
+        if invalidCounter >= 25:
+            raise ValueError
 
     #assert(isValid(seqCopy))
     return seqCopy
@@ -325,3 +327,35 @@ def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProb
             node.up = upAncestors[node]
         for node in leafChildren:
             node.children = leafChildren[node]
+
+if __name__ == '__main__':
+
+    from GuestTreeGen import expon, buildGuestTree
+    from HostTreeGen import createRandomTopology
+    from stats import gaussNoise
+    from rootSequence import genRandomSequence2 as grs
+    import pickle
+
+    eppath = '/home/caluru/Documents/shilpa/treeSimulation/simulation/zf_shilpa_probabilities.pickle'
+    emissionProbs = pickle.load(open(eppath))
+    hmmfile = '/home/caluru/Data/hmmfiles/zf_shilpa_232.hmm'
+
+    def s2(x):
+        denom = 1 + exp(7-x)
+        return 1 - .6 / denom
+
+    def expfunc(minimum=1, maximum=3):
+        """Exponential distribution with lambda=0.75 and min/max parameters"""
+        return min(maximum, max(minimum, int(expon(0.75).rvs())))
+
+    def selfSim(seqs):
+        return selfSimilarity('asdf', seqs, hmmfile, False)
+
+    sd = 1 #startingDomains
+
+    hostTree = createRandomTopology(1, 1, lambda x: x)
+    guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .2, gaussNoise, sd)
+
+    rootSequence = grs(sd)
+    evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs)
+    selfSimilarity('asdf', hostTree.sequence, hmmfile, True) #pylint: disable=no-member

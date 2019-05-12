@@ -234,9 +234,18 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
 
     #clean(host, guest) #Only add this back in when clean problems are solved
 
-    #for debugging purposes only
-    for node in guest:
-        if 'dupNumber' not in node.features:
-            node.add_feature('dupNumber', -1)
-
     return guest, nodemap
+
+if __name__ == '__main__':
+
+    def s2(x):
+        denom = 1 + exp(7-x)
+        return 1 - .6 / denom
+
+    def expfunc(minimum=1, maximum=3):
+        """Exponential distribution with lambda=0.75 and min/max parameters"""
+        return min(maximum, max(minimum, int(expon(0.75).rvs())))
+
+    g = buildGuestTree(Tree(), s2, expfunc, .2 ,gaussNoise, 1)[0]
+    for node in g:
+        print g.get_distance(node)
