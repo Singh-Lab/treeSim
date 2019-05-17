@@ -173,7 +173,7 @@ def createOrthoTree(hostTree, names, sequences, filename):
     subtrees = []
 
     for i in range(len(grouped)):
-        column = grouped[i]
+        #column = grouped[i]
         names = domNames[i]
         subtrees += splitByClade(host.copy('newick'), domNames)
 
@@ -181,14 +181,44 @@ def createOrthoTree(hostTree, names, sequences, filename):
 
 def mlTree(msafile, treefile, outgroup=False):
     """Runs IQTree on the input file given ("""
-    cmd = "iqtree -s " + msafile + " -t " + treefile + " -pre " + msafile
+    cmd = "iqtree -s " + msafile + " -z " + treefile #TODO: Change -z back to -t!
     if outgroup: cmd += " -o Outgroup"
-    os.system(cmd)
+    os.system(cmd + " > thingy.txt")
 
 def mlTree2(msafile, outgroup=False):
     """Runs IQTree on the input file given ("""
     cmd = "iqtree -s " + msafile + " -pre " + msafile
     if outgroup: cmd += " -o Outgroup"
+    os.system(cmd + " > /dev/null 2>&1")
+
+def recScore(hostfile, guestfile):
+    """Runs Notung and returns the reconciliation score with D = 2, L = 1"""
+    def createRecTree(treefile):
+        #Takes in a gene tree and converts it into notung format. Also removes the outgroup
+        t = Tree(treefile)
+        #Remove outgroup
+        if t.children[0].name == 'Outgroup':
+            t = t.children[1]
+        elif t.children[1].name == 'Outgroup':
+            t = t.children[0]
+        #Correct naming scheme
+        for leaf in t:
+            name = leaf.name.split("_")
+            leaf.name = name[1] + "_h" + name[0][1:]
+        return t
+    t = createRecTree(guestfile)
+    t.write(outfile='guest.nwk')
+    notung = '/home/caluru/Downloads/Notung-2.9/Notung-2.9.jar --reconcile --parsable'
+    cmd = 'java -jar ' + notung + ' -s ' + hostfile + ' -g guest.nwk'
+    os.system(cmd + "> notungoutput.txt")
+    f = list(open('guest.nwk.reconciled.parsable.txt'))[0]
+    score = f.split()[0]
+    os.system('rm guest.nwk.reconciled guest.nwk.reconciled.parsable.txt guest.nwk')
+    return score
+
+def logLikelihood(msafile, treefile):
+    #Takes in an msa and a tree topology and uses IQTree to generate a log likelihood
+    cmd = "iqtree -s " + msafile + " -z " + treefile
     os.system(cmd)
 
 if __name__ == '__main__':

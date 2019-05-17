@@ -49,7 +49,7 @@ def createRandomTopology(numLeaves, treeHeight, heightDistribution):
 
     nameCounter = 0
     for node in host.traverse():
-        node.name = "H" + str(nameCounter)
+        node.name = "h" + str(nameCounter)
         nameCounter += 1
     
     assignBranchLengths(host, treeHeight, heightDistribution)
@@ -95,7 +95,7 @@ def birthDeathTree(birthRate, deathRate, treeHeight):
             node.dist += height
                 
     if host.children == []:
-        host.name = "H0"
+        host.name = "h0"
         return host
 
     #remove lost nodes
@@ -121,7 +121,7 @@ def birthDeathTree(birthRate, deathRate, treeHeight):
 
     nameCounter = 0
     for node in host.traverse():
-        node.name = "H" + str(nameCounter)
+        node.name = "h" + str(nameCounter)
         nameCounter += 1
 
     return host
@@ -169,7 +169,7 @@ def readHostTree(treeFile, treeHeight = -1):
     nameCounter = 0
     for node in host.traverse():
         if node.name == '':
-            node.name = "H" + str(nameCounter)
+            node.name = "h" + str(nameCounter)
             nameCounter += 1
 
     #If rescaling is desired

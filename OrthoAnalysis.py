@@ -142,6 +142,15 @@ def selfSimilarity(name, sequence, hmmfile, heatmap=False):
             simMatrix[i][j] = domainSim(domains[i], domains[j])
             simMatrix[j][i] = simMatrix[i][j]
 
+    #Normalization step
+    if len(simMatrix) > 1:
+        bias = np.min(simMatrix)
+        scale = np.max(simMatrix) - bias
+        
+        for i in range(len(simMatrix)):
+            for j in range(len(simMatrix)):
+                simMatrix[i][j] = (simMatrix[i][j] - bias) / scale
+
     if heatmap:
         sns.heatmap(simMatrix, cmap='viridis')
         #plt.savefig('tmp/' + name + '.pdf')
@@ -178,7 +187,8 @@ def columnSimilarity(sequences, hmmfile):
     return columns
 
 def averageSimilarity(ff):
-    domains = ff.getAllDomains()
+    #domains = ff.getAllDomains()
+    pass
 
 
 if __name__ == "__main__":

@@ -31,7 +31,7 @@ def createTree(n):
         node = createNode()
         node.add_feature('position', i)
         node.pos = i
-        node.name = "G0_" + str(i)
+        node.name = "g0_" + str(i)
         tree.children.append(node)
         node.up = tree
 
@@ -43,8 +43,8 @@ def addcherry(node, hostName = '', domCounter = 0):
     right = createNode()
 
     if hostName != '':
-        left.name = "G" + hostName[1:] + "_" + str(domCounter)
-        right.name = "G" + hostName[1:] + "_" + str(domCounter + 1)
+        left.name = "g" + hostName[1:] + "_" + str(domCounter)
+        right.name = "g" + hostName[1:] + "_" + str(domCounter + 1)
         domCounter += 2
 
     left.add_feature('pos', 0)
@@ -109,7 +109,7 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
         leaf.add_feature('bl', branchLength)
     if hostName != '':
         for leaf in leaves:
-            leaf.name = 'G' + hostName[1:] + "_" + str(domCounter)
+            leaf.name = 'g' + hostName[1:] + "_" + str(domCounter)
             domCounter += 1
     leaves.sort(key=lambda x: x.pos)
     dist = branchFunc(eventDist)
@@ -183,7 +183,7 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
         nodemap (dict): host -> guest mapping of nodes
     """
     guest = createTree(startSize)
-    guest.name = "G" + host.name[1:] + "_0"
+    guest.name = "g" + host.name[1:] + "_0"
     guest.add_feature('pos', 0)
     nodemap = {}
     branchLength = 0
