@@ -4,7 +4,7 @@ from os import system
 from ete3 import Tree
 from HostTreeGen import createRandomTopology
 from OrthoAnalysis import selfSimilarity, groupDomains, columnSimilarity
-from OrthoNJ import prune, mlTree, mlTree2
+from OrthoNJ import prune, mlTree, mlTree2, recScore
 from GuestTreeGen import buildGuestTree, exp, expon
 from CreateSequences import evolveAlongTree, evolveSequence
 from stats import gaussNoise
@@ -13,14 +13,16 @@ from TreeUtils import writeTree, writeFasta, findDomains
 from random import randint
 import pickle
 import numpy as np
+from Utils import printProgressBar
+from datetime import datetime
 
 eppath = '/home/caluru/Documents/shilpa/treeSimulation/simulation/zf_shilpa_probabilities.pickle'
 emissionProbs = pickle.load(open(eppath))
 hmmfile = '/home/caluru/Data/hmmfiles/zf_shilpa_232.hmm'
 
 def s2(x):
-    denom = 1 + exp(7-x)
-    return 1 - .6 / denom
+    denom = 1 + exp(10-x) if x < 10 else 1
+    return 1 - .5 / denom
 
 def expfunc(minimum=1, maximum=3):
     """Exponential distribution with lambda=0.75 and min/max parameters"""
@@ -29,6 +31,18 @@ def expfunc(minimum=1, maximum=3):
 def selfSim(seqs):
     return selfSimilarity('asdf', seqs, hmmfile, False)
 
+def treeskew(tree):
+    #outputs height of tree, trying to measure imbalance in the tree
+    farthest = tree.get_farthest_leaf(topology_only=True)
+    return str(farthest[1])
+
+def findLeaves(nodes):
+    leaves = []
+    for node in nodes:
+        if node.children == []:
+            leaves.append(node)
+    return leaves
+
 def generateIQTree():
 
     sd = 1 #startingDomains
@@ -36,15 +50,18 @@ def generateIQTree():
     hostTree = createRandomTopology(1, 1, lambda x: x)
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .2, gaussNoise, sd)
 
-    print hostTree.get_ascii()
-
     rootSequence = grs(sd)
     evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs)
 
-    seqs = findDomains(hostTree.sequence, hmmfile)[2] #pylint: disable=no-member
-    names = [(leaf.position, leaf.name) for leaf in guestTree if leaf.event != 'LOSS']
-    names.sort()
-    names = [name[1] for name in names]
+    names, seqs = [], []
+
+    for node in hostTree:
+        seqs += findDomains(node.sequence, hmmfile)[2]
+        gnodes = findLeaves(nodeMap[node])
+        n = [(leaf.position, leaf.name) for leaf in gnodes if leaf.event != 'LOSS']
+        n.sort()
+        names += [name[1] for name in n]
+
     guestTree = prune(guestTree, names)
     outgroup = Tree()
     outgroup.up = guestTree
@@ -57,22 +74,15 @@ def generateIQTree():
     names.insert(0, 'Outgroup')
 
     guestTree.write(outfile = 'testtree.nwk')
+    hostTree.write(outfile='hosttree.nwk')
+    addRandomTree('testtree.nwk')
 
     writeFasta(names, seqs, 'testfasta.fa', False)
     mlTree('testfasta.fa', 'testtree.nwk', True)
     iqtree = Tree('testfasta.fa.treefile')
     iqtree.set_outgroup(iqtree&('Outgroup'))
 
-    writeFasta(names, seqs, 'testfasta2.fa', False)
-    mlTree2('testfasta2.fa', True)
-    iqtree2 = Tree('testfasta2.fa.treefile')
-    iqtree2.set_outgroup(iqtree2&('Outgroup'))
-
-    print guestTree
-    print iqtree
-    print iqtree2
-
-    return hostTree, guestTree, iqtree, iqtree2
+    return hostTree, guestTree, iqtree
 
 def fivenumberstatistic(sim):
     flat = []
@@ -88,39 +98,117 @@ def fivenumberstatistic(sim):
 
     return flat[0], flat[fq], flat[median], flat[tq], flat[-1]
 
-failcounter = 0
-f = open('output.txt','w')
-f.write('RF\tMaxRF\tMin\tQ1\tMedian\tQ3\tMax\n')
-i = 0
-while i < 200:
-    try:
-        hostTree, guestTree, iqtree, iqtree2 = generateIQTree()
-        system('rm testfasta*')
-        rf, maxrf = guestTree.robinson_foulds(iqtree)[:2]
-        sim = selfSim(hostTree.sequence) #pylint: disable=no-member
-        out = str(rf) + '\t' + str(maxrf) + '\t'
-        fns = fivenumberstatistic(sim)
-        for stat in fns:
-            out += str(stat) + '\t'
-        f.write(out + '\n')
-        i += 1
-    except:
-        failcounter += 1
-        continue
+def noHost(samples):
+    failcounter = 0
+    f = open('output.txt','w')
+    f.write('Filename\tRF\tMaxRF\tPct RF\tMin\tQ1\tMedian\tQ3\tMax\tReal Tree Height \
+                \tIQTree Height\tIQTree Score\tReal Score\tRandom Score \t')
+                #\tIQTree Rec Score\tReal Rec Score\n')
+    #write out actual and reconstructed tree as well as host sequence
+    #Filenames: 1.tree, 1.iqtree, 1.seq
+    treefilepath = 'output_trees/'
+    i = 0
+    while i < samples:
+        printProgressBar(i+1, samples, suffix=str(failcounter))
 
-print '\nFAILCOUNTER WAS', failcounter
-f.close()
+        try:
+            #Generate Data
+            hostTree, guestTree, iqtree = generateIQTree()
+            guestTree.write(outfile = treefilepath + str(i) + '.tree')
+            iqtree.write(outfile= treefilepath + str(i) + '.iqtree')
 
-"""
-selfSim(hostTree.sequence) #pylint: disable=no-member
+            #Collect Stats
+            iqscore, realscore, randscore = parseIQOutput('thingy.txt')
+            system('rm testfasta*')
+            rf, maxrf = guestTree.robinson_foulds(iqtree)[:2]
+            thing = [node for node in hostTree][0]
+            sim = selfSim(thing.sequence) #pylint: disable=no-member
+            out = str(i) + '.txt\t' + str(rf) + '\t' + str(maxrf) + '\t'
+            out += str(round(float(rf)/maxrf,2)) + '\t'
+            fns = fivenumberstatistic(sim)
+            for stat in fns:
+                out += str(stat) + '\t'
+            out += treeskew(guestTree) + '\t'
+            out += treeskew(iqtree) + '\t'
+            out += iqscore + '\t' + realscore + '\t' + randscore + '\t'
+            #out += recScore('hosttree.nwk', 'output_trees/' + str(i) + '.iqtree') + '\t'
+            #out += recScore('hosttree.nwk', 'output_trees/' + str(i) + '.tree')
+            f.write(out + '\n')
+            
+            #Write out sequence file
+            seqfile = treefilepath + str(i) + '.seq'
+            g = open(seqfile, 'w')
+            g.write(hostTree.sequence) #pylint: disable=no-member
+            g.close()
 
-g = groupDomains(names, seqs, hmmfile)
-val = 0 #randint(0,9)
+            i += 1
 
-selfSimilarity(names[val], seqs[val], hmmfile, True)
-print columnSimilarity(seqs, hmmfile)
+        except:
+            failcounter += 1
 
+    f.close()
 
-writeFasta(names, seqs, 'testfasta.fa')
-guestTree.write(outfile='testtree.nwk', format=1)
-"""
+def withHost():
+    sd = 1 #startingDomains
+
+    hostTree = createRandomTopology(1, .5, lambda x: x)
+    guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .1, gaussNoise, sd)
+
+    hostTree.write(outfile='host.nwk')
+    guestTree.children[0].write(outfile='guest.nwk')
+    print guestTree
+
+    rootSequence = grs(sd)
+    evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs)
+    names = [(leaf.position, leaf.name) for leaf in guestTree if leaf.event != 'LOSS']
+    names.sort()
+    names = [i[1] for i in names]
+    seqs = findDomains(hostTree.sequence, hmmfile)[2] #pylint: disable=no-member
+    writeFasta(names, seqs, 'sequences.fa')
+
+def parseIQOutput(filename):
+    f = list(open(filename))
+    oll = 0 #index of optimal log likelihood
+    test = 0 #index of real and random log likelihood
+
+    for i in range(len(f)):
+        if 'FINALIZING TREE SEARCH' in f[i]:
+            f = f[i:]
+            break
+    
+    for i in range(len(f)):
+        if 'Optimal log-likelihood' in f[i]:
+            oll = i
+        #Assumes that the real score and the score of one random tree were evaluated
+        if 'Reading trees in testtree.nwk' in f[i]:
+            test = i+2
+
+    optscore = f[oll].split()[-1]
+    realscore = f[test].split()[-1]
+    randscore = f[test+1].split()[-1]
+
+    return optscore, realscore, randscore
+
+def addRandomTree(treefile):
+    #Adds a second tree to the given treefile with the same leaf names but a random topology
+    t = Tree(treefile)
+    names = set([leaf.name for leaf in t])
+    names.discard('Outgroup')
+    g = Tree()
+    g.populate(len(names))
+    for leaf in g:
+        leaf.name = names.pop()
+    out = Tree()
+    out.populate(2)
+    out.children[0].name = 'Outgroup'
+    out.children[1] = g
+    g.up = out
+    outtree = out.write(format=9)
+    f = open(treefile, 'a')
+    f.write(outtree)
+    f.close()
+
+if __name__ == "__main__":
+    print datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '\n'
+    withHost()
+    print '\n', datetime.now().strftime('%Y-%m-%d %H:%M:%S')
