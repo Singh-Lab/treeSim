@@ -144,7 +144,7 @@ def findDomains(sequence, hmmfile):
     
     return findDomainsFile('tmp/tmp.fa', hmmfile)
 
-def printDomSeq(sequence, hmmfile):
+def printDomSeq(sequence, hmmfile, minimal_rep = False):
     """
     prints the sequence with domains highlighted in red 
     (first character highlighted in green)
@@ -162,6 +162,15 @@ def printDomSeq(sequence, hmmfile):
     for domain in domains:
         sequence = sequence.replace(domain, "xxx")
     sequences = sequence.split("xxx")
+
+    if minimal_rep:
+        out = ''
+        for i in range(len(domains)):
+            out += '---' + RED + "XXX" + NORMAL
+        out += '---'
+
+        print out
+        return
     
     #Reassemble full sequence post evolution
     out = ''

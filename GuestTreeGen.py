@@ -7,6 +7,9 @@ from random import randint
 
 LOSS_CODE = -1
 #DUPLICATION_FACTOR = 3 breaks tandem duplication detection, do this later instead
+dupevents = 0
+dupnodes = 0
+lossnodes = 0
 
 #####################################
 #                                   #
@@ -103,6 +106,11 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
     Returns:
         branchLength (float): 
     """
+	
+    global dupnodes
+    global dupevents
+    global lossnodes
+
     domCounter = 0 #if hostName is given, names of dom nodes will be 'hostName_domCounter'
     leaves = [leaf for leaf in startingTree]
     for leaf in leaves:
@@ -125,6 +133,9 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
             start = np.random.randint(numDomains - size + 1)
             dupNumber = randint(1,99999)
 
+            dupevents += 1
+            dupnodes += size
+
             for i in range(start, start+size):
                 node = leaves[i]
                 node.event = "DUPLICATION"
@@ -146,6 +157,7 @@ def buildGuestNode(startingTree, dupRateFunc, dupfunc, hostName = '',
                 
         #Loss
         else:
+            lossnodes += 1
             position = np.random.randint(len(leaves))
             leaves[position].pos = LOSS_CODE
             leaves[position].event = 'LOSS'
@@ -233,8 +245,12 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
                 gleaves[treepositions[i]].add_child(newTrees[i])
 
     #clean(host, guest) #Only add this back in when clean problems are solved
+    print cost()
 
     return guest, nodemap
+
+def cost():
+    return 2 * dupevents + .5 * (dupnodes - dupevents) + lossnodes
 
 if __name__ == '__main__':
 
@@ -247,5 +263,5 @@ if __name__ == '__main__':
         return min(maximum, max(minimum, int(expon(0.75).rvs())))
 
     g = buildGuestTree(Tree(), s2, expfunc, .2 ,gaussNoise, 1)[0]
-    for node in g:
-        print g.get_distance(node)
+    print dupevents, dupnodes, lossnodes
+    print g.get_ascii(attributes=['event'])

@@ -115,7 +115,7 @@ def noHost(samples):
             #Generate Data
             hostTree, guestTree, iqtree = generateIQTree()
             guestTree.write(outfile = treefilepath + str(i) + '.tree')
-            iqtree.write(outfile= treefilepath + str(i) + '.iqtree')
+            iqtree.write(outfile = treefilepath + str(i) + '.iqtree')
 
             #Collect Stats
             iqscore, realscore, randscore = parseIQOutput('thingy.txt')
@@ -151,7 +151,8 @@ def noHost(samples):
 def withHost():
     sd = 1 #startingDomains
 
-    hostTree = createRandomTopology(1, .5, lambda x: x)
+    hostTree = createRandomTopology(4, .5, lambda x: x)
+    print hostTree
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .1, gaussNoise, sd)
 
     hostTree.write(outfile='host.nwk')
