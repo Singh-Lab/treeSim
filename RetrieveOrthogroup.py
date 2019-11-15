@@ -96,8 +96,40 @@ def fastaToSeqs(fasta):
         else:
             sequences.append(fasta[i])
 
+    print headers, sequences
+
     speciesIDs = [line.split(":")[0][1:] for line in headers]
     names = [line.split('"pub_gene_id":')[1].split(',')[0].strip('"') for line in headers]
     names = [thing.split(';')[1] if ';' in thing else thing for thing in names]
 
     return (names, sequences, speciesIDs)
+
+def multToSingle(infile = 'genes.fa', outfile = 'singleLine.fa'):
+	"""
+	Takes a msa in which sequences takes multiple lines and concatenates them into one line
+	"""
+	f = list(open(infile))
+	g = open(outfile,'w')
+
+	names = [f[0]]
+	sequences = []
+	sequence = ""
+
+	for line in f[1:]:
+		if line[0] == ">":
+			names.append(line)
+			sequences.append(sequence + '\n')
+			sequence = ""
+		else:
+			sequence += line[:-1]
+		
+	sequences.append(sequence)
+
+	for i in range(len(names)):
+		g.write(names[i])
+		g.write(sequences[i])
+
+
+if __name__ == "__main__":
+    multToSingle()
+    print fastaToSeqs(list(open('singleLine.fa')))
