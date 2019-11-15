@@ -186,10 +186,8 @@ def columnSimilarity(sequences, hmmfile):
 
     return columns
 
-def averageSimilarity(ff):
-    #domains = ff.getAllDomains()
-    pass
-
+def averageSimilarity(sequence, hmmfile):
+    return np.mean(selfSimilarity('', sequence, hmmfile))
 
 if __name__ == "__main__":
     data = ConfigParser.ORTHOGROUP_PATH #pylint: disable=no-member

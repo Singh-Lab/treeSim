@@ -18,7 +18,7 @@ from datetime import datetime
 
 eppath = '/home/caluru/Documents/shilpa/treeSimulation/simulation/zf_shilpa_probabilities.pickle'
 emissionProbs = pickle.load(open(eppath))
-hmmfile = '/home/caluru/Data/hmmfiles/zf_shilpa_232.hmm'
+hmmfile = '/Users/chaitanya/Data/hmmfiles/zf_shilpa_232.hmm'
 
 def s2(x):
     denom = 1 + exp(10-x) if x < 10 else 1
