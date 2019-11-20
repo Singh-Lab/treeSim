@@ -185,3 +185,16 @@ def isValid(domain):
     valid = len(domain) == 23 and domain[2] == "C" and domain[5] == "C"
     valid &= domain[18] == "H" and domain[22] == "H"
     return valid
+
+def raxml(infile, outfile):
+    command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 -s '
+    command += infile + ' -n ' + outfile + ' -m GTRGAMMA -T 8 -p ' + str(np.random.randint(2000))
+    command += ' > raxml_log.txt'
+    os.system(command)
+
+def raxml_score(benchfile, testfile, seqfile):
+    command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 -s '
+    #Switch to -f h if this takes too long
+    command += '-f H -t' + benchfile + ' -z ' + infile + ' -s ' + seqfile + ' -m GTRGAMMA -T 8'
+    command += ' > raxml_log.txt' 
+    #TODO: Read results and select tree
