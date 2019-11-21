@@ -4,18 +4,19 @@ import numpy as np
 def createTreeRepresentation(t):
 	i = 0
 	for node in [n for n in t.traverse()][::-1]:
-		node.name = str(i)
+        node.add_feature('label', str(i))
+		#node.name = str(i)
 		i += 1
 
 	g = np.zeros((i,i))
 	for node in [n for n in t.traverse()][::-1]:
 		if node.children == []:
-			pos = int(node.name)
+			pos = int(node.labe)
 			g[pos][pos] = 1
 		else:
-			lchild = g[int(node.children[0].name)]
-			rchild = g[int(node.children[1].name)]
-			me = int(node.name)
+			lchild = g[int(node.children[0].label)]
+			rchild = g[int(node.children[1].label)]
+			me = int(node.label)
 			for k in range(len(g[0])):
 				g[me][k] = max(lchild[k], rchild[k])
 			g[me][me] = 1
@@ -27,7 +28,7 @@ def createDistMatrix(host):
 	d = np.zeros((size, size), dtype=int)
 	for a in host.traverse():
 		for b in host.traverse():
-			i, j = int(a.name), int(b.name)
+			i, j = int(a.label), int(b.label)
 			if i < j:
 				d[i][j] = a.get_distance(b, topology_only=True)
 			elif i > j:
@@ -62,45 +63,28 @@ def createEqns(h, g, hrep, grep, mapping, distmat, eqns='ALL'):
 
 	for u in g.traverse():
 		if u.children == []:
-			addcolumn(namevar("X", [u.name, u.name]), 2, "COST", coldict)
+			addcolumn(namevar("X", [u.label, u.label]), 2, "COST", coldict)
 		else:
-			addcolumn(namevar("X", [u.name, u.name]), 4, "COST", coldict)
+			addcolumn(namevar("X", [u.label, u.label]), 4, "COST", coldict)
 			v, w = u.children
 			for i in range(len(hrep)):
 				for j in range(len(hrep)):
-					addcolumn(namevar("Y", [u.name, v.name, i, j]), distmat[i][j]-1, "COST", coldict)
-					addcolumn(namevar("Y", [u.name, w.name, i, j]), distmat[i][j]-1, "COST", coldict)
+					addcolumn(namevar("Y", [u.label, v.label, i, j]), distmat[i][j]-1, "COST", coldict)
+					addcolumn(namevar("Y", [u.label, w.label, i, j]), distmat[i][j]-1, "COST", coldict)
 		for k in range(1,6):
 			coeff = -1.5 * ((k - 1.) / k)
-			addcolumn(namevar("T", [u.name, k]), coeff, "COST", coldict)
-
-	"""
-	#COST
-	eqnames.append(" N COST")
-
-	for u in g.traverse():
-		if u.children == []:
-			addcolumn("X" + str(i) * 2, 2, "COST", coldict)
-			continue
-		addcolumn("X" + str(u.name) * 2, 4, "COST", coldict)
-		v, w = u.children
-		for i in range(len(hrep)):
-			for j in range(len(hrep)):
-				addcolumn("Y" + str(u.name) + str(v.name) + str(i) + str(j), distmat[i][j]-1, "COST", coldict)
-				addcolumn("Y" + str(u.name) + str(w.name) + str(i) + str(j), distmat[i][j]-1, "COST", coldict)
-	"""
-
+			addcolumn(namevar("T", [u.label, k]), coeff, "COST", coldict)
 
 	#(0) - Mapping Equalities
 	if eqns == "ALL" or 0 in eqns:
 		eqcounter = 0
 		for u in mapping:
 			for i in range(len(hrep)):
-				varname = namevar("M", [u,i])
+				varname = namevar("M", [int(u.label), i])
 				eqname = "INVAR" + str(eqcounter)
 				eqnames.append(" E " + eqname)
 				eqcounter += 1
-				if mapping[u] == i:
+				if mapping[u].label == i:
 					addrhs(eqname, 1, rhs)
 				else:
 					addrhs(eqname, 0, rhs)
@@ -117,8 +101,8 @@ def createEqns(h, g, hrep, grep, mapping, distmat, eqns='ALL'):
 				for j in range(len(hrep)):
 					if hrep[i][j] == 0:
 
-						parent = namevar("M", [u.name, i])
-						child1 = namevar("M", [v.name, j])
+						parent = namevar("M", [u.label, i])
+						child1 = namevar("M", [v.label, j])
 
 						eqname = "MAP" + str(eqcounter)
 						eqnames.append(" L " + eqname)
@@ -127,7 +111,7 @@ def createEqns(h, g, hrep, grep, mapping, distmat, eqns='ALL'):
 						addcolumn(parent, 1, eqname, coldict)
 						addcolumn(child1, 1, eqname, coldict)
 
-						child2 = namevar("M", [w.name, j])
+						child2 = namevar("M", [w.label, j])
 
 						eqname = "MAP" + str(eqcounter)
 						eqnames.append(" L " + eqname)
@@ -254,9 +238,9 @@ def createEqns(h, g, hrep, grep, mapping, distmat, eqns='ALL'):
 					eqnames.append(" G " + eqname)
 					eqcounter += 1
 					addrhs(eqname, 0, rhs)
-					addcolumn(namevar("X", [u.name, u.name]), 1, eqname, coldict)
+					addcolumn(namevar("X", [u.label, u.label]), 1, eqname, coldict)
 					coeff = (hrep[i][j] + hrep[j][i]) / -2.0
-					varname = namevar("Y", [v.name, w.name, i, j])
+					varname = namevar("Y", [v.label, w.label, i, j])
 					addcolumn(varname, coeff, eqname, coldict)
 
 	#(10)
@@ -269,25 +253,25 @@ def createEqns(h, g, hrep, grep, mapping, distmat, eqns='ALL'):
 			eqnames.append(" G " + eqname)
 
 			addrhs(eqname, -1, rhs)
-			addcolumn(namevar("Y", [u.name, v.name, i, j]), 1, eqname, coldict)
-			addcolumn(namevar("M", [u.name, i]), -1, eqname, coldict)
-			addcolumn(namevar("M", [v.name, j]), -1, eqname, coldict)
+			addcolumn(namevar("Y", [u.label, v.label, i, j]), 1, eqname, coldict)
+			addcolumn(namevar("M", [u.label, i]), -1, eqname, coldict)
+			addcolumn(namevar("M", [v.label, j]), -1, eqname, coldict)
 
 			#9.2
 			eqname = "DUPUI" + str(eqcounter)
 			eqnames.append(" L " + eqname)
 
 			addrhs(eqname, 0, rhs)
-			addcolumn(namevar("Y", [u.name, v.name, i, j]), 1, eqname, coldict)
-			addcolumn(namevar("M", [u.name, i]), -1, eqname, coldict)
+			addcolumn(namevar("Y", [u.label, v.label, i, j]), 1, eqname, coldict)
+			addcolumn(namevar("M", [u.label, i]), -1, eqname, coldict)
 
 			#9.3
 			eqname = "DUPVJ" + str(eqcounter)
 			eqnames.append(" L " + eqname)
 
 			addrhs(eqname, 0, rhs)
-			addcolumn(namevar("Y", [u.name, v.name, i, j]), 1, eqname, coldict)
-			addcolumn(namevar("M", [v.name, j]), -1, eqname, coldict)
+			addcolumn(namevar("Y", [u.label, v.label, i, j]), 1, eqname, coldict)
+			addcolumn(namevar("M", [v.label, j]), -1, eqname, coldict)
 
 			return eqcounter + 1
 
