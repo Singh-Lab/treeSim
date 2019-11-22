@@ -100,10 +100,12 @@ def s(x):
     return .7 - .3 / denom
 
 def s2(x):
+    """Tighter sigmoid than s(x)"""
     denom = 1 + exp(10-x)
     return .7 - .6 / denom
 
 def s3(x):
+    """s2(x) but with strict cutoffs at 7 and 13 domains"""
     if x >= 13:
         return 0
     if x <= 7:
@@ -112,8 +114,20 @@ def s3(x):
 
 #Utilities for finding domains
 
-#Finds all domains in infile according to hmm in hmmfile using hmmsearch232
 def findDomainsFile(infile, hmmfile):
+    """
+    Finds all domains in infile according to hmm in hmmfile using hmmsearch232.
+    Assumes only one sequence is in the infile
+
+    Args:
+    infile  (str): The path to the fasta file to search for domains in
+    hmmfile (str): Path to file containing hmm to search for
+
+    Output:
+    starts (list): List of starting positions of domains found
+    ends   (list): List of ending positions of domains found
+    seqs   (list): List of domain sequences found 
+    """
     #domName = os.popen("grep 'NAME' " + hmmfile).read().split()[1]
     seqName = list(open(infile))[0][1:].strip()
     os.system("hmmsearch232 --domE 0.00001 " + hmmfile + " " + infile 
@@ -138,6 +152,18 @@ def findDomainsFile(infile, hmmfile):
 
 #Finds all domains in the input sequence according to hmm in hmmfile using hmmsearch232	
 def findDomains(sequence, hmmfile):
+    """
+    Finds domains in the given sequence
+
+    Args:
+    sequence (str): sequence to search for domains in
+    hmmfile (str): Path to file containing hmm to search for
+
+    Output:
+    starts (list): List of starting positions of domains found
+    ends   (list): List of ending positions of domains found
+    seqs   (list): List of domain sequences found 
+    """
     g = open('tmp/tmp.fa','w')
     g.write('>seq\n' + sequence)
     g.close()
@@ -148,6 +174,12 @@ def printDomSeq(sequence, hmmfile, minimal_rep = False):
     """
     prints the sequence with domains highlighted in red 
     (first character highlighted in green)
+
+    Args:
+    sequence (str): Protein sequence to print
+    hmmfile  (str): Path to hmm file of domain to highlight
+    mimimal_rep (bool): If true, prints a string of dashes and X's (nondomain and domain
+                        sequences) rather than the full highlighted sequences
     """
 
     #Escape sequences used to colorize terminal output
@@ -186,13 +218,35 @@ def isValid(domain):
     valid &= domain[18] == "H" and domain[22] == "H"
     return valid
 
-def raxml(infile, outfile):
+def raxml(infile, outext):
+    """
+    Runs raxml with set parameters on the input 
+
+    Args:
+    infile (str): fasta file to build tree from
+    outext (str): output file extension to use. Output tree will be at
+                  RAxML_bestTree.<outext>
+    """
     command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 -s '
-    command += infile + ' -n ' + outfile + ' -m PROTGAMMAJTT -T 8 -p ' + str(np.random.randint(2000))
+    command += infile + ' -n ' + outext + ' -m PROTGAMMAJTT -T 8 -p ' + str(np.random.randint(2000))
     command += ' > raxml_log.txt'
     os.system(command)
 
 def raxml_score(benchfile, testfile, seqfile):
+    """
+    Uses RAxML to compute the SH score between the benchmark tree constructed by RAxML and
+    a set of other trees. Outputs a binary vector where the ith entry is 1 if tree i is 
+    significantly worse than the benchmark and 0 otherwise
+
+    Args:
+    benchfile (str): path to newick file containing the best tree found by RAxML
+    testfile  (str): path to newick file containing all trees to test, one per line
+    seqfile   (str): path to fasta file containing leaf sequences
+
+    Output:
+    scores (list): A list of 0/1 entries specifying whether or not each tree is
+                   significantly worse than the benchmark or not.
+    """
     #Run RAxML to find if tree in benchfile is significantly better than those in testfile
     command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 '
     #Switch to -f h if this takes too long
@@ -212,6 +266,6 @@ def raxml_score(benchfile, testfile, seqfile):
     scores = []
     for line in f:
         answer = line.split('Significantly Worse: ')[1].split()[0]
-        scores.append(1 if answer == 'No' else 0)
+        scores.append(1 if answer == 'Yes' else 0)
 
     return scores
