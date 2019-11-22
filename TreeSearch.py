@@ -3,7 +3,7 @@
 from ete3 import Tree
 import numpy as np
 import os
-from ilp_generator import createTreeRepresentation, createDistMatrix, createEqns
+from ilp_generator import createTreeRepresentation, createDistMatrix, createEqns, write
 from gurobi import *
 
 def spr(tree, subtree, new_sibling):
@@ -96,8 +96,8 @@ def reconcile(host, guest, leafmap):
     h = createTreeRepresentation(host)
     g = createTreeRepresentation(guest)
     d = createDistMatrix(host)
-    eqnames, rhs, coldict = createEqns(host, guest, h, g, leafmapping, d)
-    writeEqns('treesolve.mps', eqnames, rhs, coldict)
+    eqnames, rhs, coldict = createEqns(host, guest, h, g, leafmap, d)
+    write('treesolve.mps', eqnames, rhs, coldict)
 
     m = read('treesolve.mps')
     m.optimize()

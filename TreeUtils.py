@@ -268,4 +268,5 @@ def raxml_score(benchfile, testfile, seqfile):
         answer = line.split('Significantly Worse: ')[1].split()[0]
         scores.append(1 if answer == 'Yes' else 0)
 
+    os.system('rm *.sco')
     return scores
