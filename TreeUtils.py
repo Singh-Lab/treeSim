@@ -188,13 +188,30 @@ def isValid(domain):
 
 def raxml(infile, outfile):
     command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 -s '
-    command += infile + ' -n ' + outfile + ' -m GTRGAMMA -T 8 -p ' + str(np.random.randint(2000))
+    command += infile + ' -n ' + outfile + ' -m PROTGAMMAJTT -T 8 -p ' + str(np.random.randint(2000))
     command += ' > raxml_log.txt'
     os.system(command)
 
 def raxml_score(benchfile, testfile, seqfile):
-    command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 -s '
+    #Run RAxML to find if tree in benchfile is significantly better than those in testfile
+    command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 '
     #Switch to -f h if this takes too long
-    command += '-f H -t' + benchfile + ' -z ' + infile + ' -s ' + seqfile + ' -m GTRGAMMA -T 8'
+    command += '-f H -t' + benchfile + ' -z ' + testfile + ' -s ' + seqfile + ' -m PROTGAMMAJTT -T 8 -n sco'
     command += ' > raxml_log.txt' 
     #TODO: Read results and select tree
+    os.system(command)
+
+    #Parse resulting logfile
+    f = list(open('RAxML_info.sco'))
+    start = 0
+    for i in range(len(f)):
+        if ' trees in File ' in f[i]:
+            start = i
+
+    f = f[start+3:]
+    scores = []
+    for line in f:
+        answer = line.split('Significantly Worse: ')[1].split()[0]
+        scores.append(1 if answer == 'No' else 0)
+
+    return scores
