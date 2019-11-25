@@ -4,7 +4,7 @@ from ete3 import Tree
 import numpy as np
 import os
 from ilp_generator import createTreeRepresentation, createDistMatrix, createEqns, write
-from gurobi import *
+from gurobipy import *
 
 def spr(tree, subtree, new_sibling):
     """
