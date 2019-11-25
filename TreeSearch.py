@@ -3,7 +3,7 @@
 from ete3 import Tree
 import numpy as np
 import os
-from ilp_generator import createTreeRepresentation, createDistMatrix, createEqns, write
+from ilp_generator import createTreeRepresentation, createDistMatrix, createEqns, write, createMapping
 from gurobipy import *
 
 def spr(tree, subtree, new_sibling):
@@ -96,18 +96,22 @@ def reconcile(host, guest, leafmap):
     h = createTreeRepresentation(host)
     g = createTreeRepresentation(guest)
     d = createDistMatrix(host)
-    eqnames, rhs, coldict = createEqns(host, guest, h, g, leafmap, d)
+    mapping = createMapping(leafmap)
+
+    eqnames, rhs, coldict = createEqns(host, guest, h, g, mapping, d)
     write('treesolve.mps', eqnames, rhs, coldict)
 
     m = read('treesolve.mps')
+    m.Params.outputflag = 0
     m.optimize()
-    cost = m.getObjective.getValue()
+    cost = m.getObjective().getValue()
 
-    os.system('rm treesolve.mps')
+    #os.system('rm treesolve.mps')
     return cost
 
 def reroot(host, guest, leafmap):
     trees = generate_rootings(guest)
+    print len(trees)
     costs = []
     
     for tree in trees:
@@ -116,7 +120,7 @@ def reroot(host, guest, leafmap):
         for node in leafmap:
             newguest = tree&(node.name)
             newmap[newguest] = leafmap[node]
-            costs.append(reconcile(host, tree, newmap))
+        costs.append(reconcile(host, tree, newmap))
 
     index = np.argmin(costs)
     return trees[index]
@@ -138,12 +142,22 @@ for i in range(300):
 """
 
 t = Tree()
-t.populate(5)
+t.populate(3)
 
 i = 0
 for node in t.traverse():
     node.name = str(i)
     i += 1
 
-a = generate_rootings(t)
-print t.get_ascii()
+#j = generate_rootings(t)
+
+g = Tree()
+g.populate(5)
+
+hostnodes = [i for i in t]
+nodemap = {}
+for node in g:
+    nodemap[node] = np.random.choice(hostnodes)
+
+best = reroot(t, g, nodemap)
+print g.robinson_foulds(best)[0]

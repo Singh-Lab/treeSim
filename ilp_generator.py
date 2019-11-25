@@ -11,7 +11,7 @@ def createTreeRepresentation(t):
     g = np.zeros((i,i))
     for node in [n for n in t.traverse()][::-1]:
         if node.children == []:
-            pos = int(node.labe)
+            pos = int(node.label)
             g[pos][pos] = 1
         else:
             lchild = g[int(node.children[0].label)]
@@ -36,6 +36,12 @@ def createDistMatrix(host):
             else:
                 d[i][j] = 0
     return d
+
+def createMapping(mapping):
+    newmap = {}
+    for node in mapping:
+        newmap[int(node.label)] = int(mapping[node].label)
+    return newmap
 
 def addcolumn(var, coeff, eqname, coldict):
     entry = "   " + var + "\t" + eqname + '\t' + str(coeff)
@@ -80,11 +86,11 @@ def createEqns(h, g, hrep, grep, mapping, distmat, eqns='ALL'):
         eqcounter = 0
         for u in mapping:
             for i in range(len(hrep)):
-                varname = namevar("M", [int(u.label), i])
+                varname = namevar("M", [u, i])
                 eqname = "INVAR" + str(eqcounter)
                 eqnames.append(" E " + eqname)
                 eqcounter += 1
-                if mapping[u].label == i:
+                if mapping[u] == i:
                     addrhs(eqname, 1, rhs)
                 else:
                     addrhs(eqname, 0, rhs)
