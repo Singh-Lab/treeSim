@@ -62,6 +62,43 @@ def pick_spr(tree):
     ns = np.random.choice(list(remaining))
     print 'subtree', subtree.name, 'ns', ns.name
     spr(tree, subtree, ns)
+    return (subtree.label, ns.label)
+
+def pick_sprs(tree, n):
+    """
+    Tries to pick n unique sprs of a tree and return a list of those sprs.
+    If that many are difficult to find, may give up early and return fewer
+
+    Arguments:
+    tree: The tree to find random sprs for
+    n: The number of unique trees to attempt to find
+
+    Output:
+    the list of sprs
+    """
+    i = 0
+    for node in tree.traverse():
+        node.add_feature('label', str(i))
+        i += 1
+
+    sprs = []
+    seen = set()
+    i = 0
+    failcount = 0
+    while i < n:
+        newTree = tree.copy()
+        used = pick_spr(newTree)
+        if used not in seen:
+            seen.add(used)
+            sprs.append(newTree)
+            i += 1
+            failcount = 0
+        else:
+            failcount += 1
+            if failcount >= 100:
+                return sprs
+    
+    return sprs
 
 def generate_rootings(tree):
     """
