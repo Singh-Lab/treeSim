@@ -5,6 +5,7 @@ import numpy as np
 import os
 from ilp_generator import createTreeRepresentation, createDistMatrix, createEqns, write, createMapping
 from gurobipy import *
+from TreeUtils import raxml, raxml_score
 
 def spr(tree, subtree, new_sibling):
     """
@@ -129,7 +130,22 @@ def generate_rootings(tree):
         trees.append(temp)
     return trees
 
+#TODO: Extract node mapping from ILP
 def reconcile(host, guest, leafmap):
+    """
+    Performs TDL reconciliation on the guest tree and returns both the cost and the full
+    mapping of guest -> host.
+
+    Args:
+    host (Tree): The host tree in ete3 format
+    guest (Tree): The guest tree in ete3 format
+    leafmapping (dict): guest -> host mapping containing all leaf nodes in the guest tree
+
+    Output:
+    cost (float): The cost of the min cost reconciliation with L = 1 and 
+                  D(n) = 2 + .5(n-1)
+    fullmap (dict): guest -> mapping containing all nodes in the guest tree
+    """
     h = createTreeRepresentation(host)
     g = createTreeRepresentation(guest)
     d = createDistMatrix(host)
@@ -143,10 +159,53 @@ def reconcile(host, guest, leafmap):
     m.optimize()
     cost = m.getObjective().getValue()
 
+    vars = m.getVars()
+    for var in vars:
+        if var.x == 1:
+
     #os.system('rm treesolve.mps')
     return cost
 
-def reroot(host, guest, leafmap):
+#TODO: Compute the cost of the reconciliation
+def reconcileDL(host, guest, leafmap):
+    """
+    Performs DL reconciliation on the guest tree and returns both the cost and the full
+    mapping of guest -> host.
+
+    Args:
+    host (Tree): The host tree in ete3 format
+    guest (Tree): The guest tree in ete3 format
+    leafmapping (dict): guest -> host mapping containing all leaf nodes in the guest tree
+
+    Output:
+    cost (float): The cost of the min cost reconciliation with L = 1 and D = 2
+    fullmap (dict): guest -> mapping containing all nodes in the guest tree
+    """
+    fullmap = {}
+    cost = 0
+    seen = set()
+    jobs = [leaf for leaf in guest]
+
+    while jobs != []:
+        job = jobs.pop(0)
+        if job in leafmap:
+            fullmap[job] = leafmap[job]
+        else:
+            a, b = job.children
+            hostmap = fullmap[a].get_common_ancestor(fullmap[b])
+            fullmap[node] = hostmap
+        seen.add(job)
+        guestParent = job.up
+        if job.up == None:
+            continue
+        a, b = guestParent.children
+        if a in seen and b in seen:
+            jobs.append(guestParent)
+
+    return cost, fullmap
+
+def reroot(host, guest, leafmap, recModule=reconcile):
+
     trees = generate_rootings(guest)
     print len(trees)
     costs = []
@@ -157,10 +216,36 @@ def reroot(host, guest, leafmap):
         for node in leafmap:
             newguest = tree&(node.name)
             newmap[newguest] = leafmap[node]
-        costs.append(reconcile(host, tree, newmap))
+        costs.append(recModule(host, tree, newmap)[0])
 
     index = np.argmin(costs)
     return trees[index]
+
+def perform_search(sequences, host, guest, leafmap, num_iter=100):
+    """
+    Performs a search in tree space surrounding the highest scoring guest 
+    tree according to raxml. Tries to find a guest with a similar likelihood 
+    value and a better reconciliation score.
+
+    Steps:
+    1) Determine reconciliation score of guest w.r.t. host
+    2) Generate 100 SPR moves, test all for reconciliation and raxml scores
+    3) Pick a better tree, move to it
+    4) Repeat 2-3 100 times
+    """
+
+    bestTree = guest
+
+    #Base nodemap on names, not actual nodes
+    nodemap = {}
+    for node in leafmap:
+        nodemap[node.name] = leafmap[node].name
+
+    for _ in range(num_iter):
+        sprs = pick_sprs(guest, 100)
+        scores = raxml_score(bestTree, sprs, sequences)
+        good_trees = [sprs[i] for i in range(len(sprs)) if scores[i] == 0]
+        
 
 """
 t = Tree()
