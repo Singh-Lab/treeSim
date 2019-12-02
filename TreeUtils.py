@@ -232,7 +232,7 @@ def raxml(infile, outext):
     command += ' > raxml_log.txt'
     os.system(command)
 
-def raxml_score(benchfile, testfile, seqfile):
+def raxml_score_from_file(benchfile, testfile, seqfile):
     """
     Uses RAxML to compute the SH score between the benchmark tree constructed by RAxML and
     a set of other trees. Outputs a binary vector where the ith entry is 1 if tree i is 
@@ -269,4 +269,35 @@ def raxml_score(benchfile, testfile, seqfile):
         scores.append(1 if answer == 'Yes' else 0)
 
     os.system('rm *.sco')
+    return scores
+
+def raxml_score(benchTree, testTrees, seqfile):
+    """
+    Uses RAxML to compute the SH score between the benchmark tree constructed by RAxML and
+    a set of other trees. Outputs a binary vector where the ith entry is 1 if tree i is 
+    significantly worse than the benchmark and 0 otherwise. Takes in ete3 objects, writes
+    them to the appropriate files and calls raxml_score_file
+
+    Args:
+    benchTree (Tree): The best tree found by raxml
+    testTree  (list): List of trees to test against the best tree
+    seqfile   (str): path to fasta file containing leaf sequences
+
+    Output:
+    scores (list): A list of 0/1 entries specifying whether or not each tree is
+                   significantly worse than the benchmark or not.
+    """
+    g = open('bestTree.nwk', 'w')
+    g.write(benchTree.write(format = 9) + '\n')
+    g.close()
+
+    g = open('otherTrees.nwk', 'w')
+    for tree in testTrees:
+        g.write(tree.write(format=9), '\n')
+    g.close()
+
+    scores = raxml_score_from_file('bestTree.nwk', 'otherTrees.nwk', seqfile)
+    os.system('rm bestTree.nwk')
+    os.system('rm otherTrees.nwk')
+
     return scores
