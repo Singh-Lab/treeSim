@@ -261,7 +261,6 @@ for i in range(300):
     pick_spr(t)
     print i
     #print t.get_ascii()
-"""
 
 t = Tree()
 t.populate(3)
@@ -283,3 +282,11 @@ for node in g:
 
 best = reroot(t, g, nodemap)
 print g.robinson_foulds(best)[0]
+"""
+
+t = Tree('RAxML_bestTree.out')
+t.set_outgroup(t.get_midpoint_outgroup())
+seqs = 'ENSG00000196724.fa'
+a = pick_sprs(t, 100)
+print 'found', len(a), 'sprs'
+print raxml_score(t, a, seqs)

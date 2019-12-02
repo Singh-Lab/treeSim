@@ -265,6 +265,8 @@ def raxml_score_from_file(benchfile, testfile, seqfile):
     f = f[start+3:]
     scores = []
     for line in f:
+        if 'Tree: ' not in line:
+            continue
         answer = line.split('Significantly Worse: ')[1].split()[0]
         scores.append(1 if answer == 'Yes' else 0)
 
@@ -293,7 +295,7 @@ def raxml_score(benchTree, testTrees, seqfile):
 
     g = open('otherTrees.nwk', 'w')
     for tree in testTrees:
-        g.write(tree.write(format=9), '\n')
+        g.write(tree.write(format=9) + '\n')
     g.close()
 
     scores = raxml_score_from_file('bestTree.nwk', 'otherTrees.nwk', seqfile)
