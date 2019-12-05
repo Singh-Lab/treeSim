@@ -372,3 +372,31 @@ def write(filename, eqnames, rhs, coldict):
 
     f.write("ENDATA")
     f.close()
+
+def extractMapping(m, host, guest):
+    """
+    Extracts a mapping from model m. Can only be called after m.optimize().
+    Assumes mapping is stored in M_X_Y variables, finds those that are set to 1.
+
+    Args:
+        m (gurobipy model): The model object containin the ILP solution
+    
+    Outputs:
+        mapping (dict): guest -> host mapping of all nodes in the guest tree
+    """
+    labelMapping = {}
+    for item in m.getVars():
+        if item.x == 1 and item.varName[0] == 'M':
+            vals = item.varName.split("_")
+            labelMapping[vals[1]] = vals[2]
+
+    labelToHost = {}
+    for node in host.traverse():
+        labelToHost[node.label] = node
+
+    mapping = {}
+    for node in guest.traverse():
+        hnode = labelToHost[labelMapping[node.label]]
+        mapping[node] = hnode
+
+    return mapping
