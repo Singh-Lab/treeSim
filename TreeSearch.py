@@ -302,4 +302,7 @@ if __name__ == '__main__':
     seqs = 'ENSG00000196724.fa'
     a = pick_sprs(t, 100)
     logging.info('found %s sprs', str(len(a)))
-    print raxml_score(t, a, seqs)
+    logging.info(str(raxml_score(t, a, seqs)))
+
+    #Test Reconciliation Modules
+
