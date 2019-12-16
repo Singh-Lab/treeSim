@@ -15,10 +15,11 @@ import pickle
 import numpy as np
 from Utils import printProgressBar
 from datetime import datetime
+from ConfigParser import ConfigParser as CP
 
 eppath = '/home/caluru/Documents/shilpa/treeSimulation/simulation/zf_shilpa_probabilities.pickle'
 emissionProbs = pickle.load(open(eppath))
-hmmfile = '/Users/chaitanya/Data/hmmfiles/zf_shilpa_232.hmm'
+hmmfile = CP.HMM_PATH
 
 def s2(x):
     denom = 1 + exp(10-x) if x < 10 else 1
@@ -164,8 +165,18 @@ def withHost():
     names = [(leaf.position, leaf.name) for leaf in guestTree if leaf.event != 'LOSS']
     names.sort()
     names = [i[1] for i in names]
-    seqs = findDomains(hostTree.sequence, hmmfile)[2] #pylint: disable=no-member
+    names.sort()
+
+    seqs = []
+    hnodes = sorted([i.name for i in hostTree]) 
+    for node in hnodes:
+        seqs += findDomains((hostTree&node).sequence, hmmfile)[2]
+
+    print len(seqs), len(names)
+
     writeFasta(names, seqs, 'sequences.fa')
+
+    return hostTree, guestTree, names, seqs
 
 def parseIQOutput(filename):
     f = list(open(filename))
@@ -211,5 +222,5 @@ def addRandomTree(treefile):
 
 if __name__ == "__main__":
     print datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '\n'
-    withHost()
+    host, guest, names, seqs = withHost()
     print '\n', datetime.now().strftime('%Y-%m-%d %H:%M:%S')

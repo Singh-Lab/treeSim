@@ -27,7 +27,7 @@ def writeTree(tree, filename):
     outputHandle.write(output)
     outputHandle.close()
 
-def readMapping(host, guest, mapfile):
+def readMapping(host, guest, mapfile=None):
     """
     Requires that the host and guest tree that the mapping refers to have already 
     been read into memory. See writeMapping for mapfile format
@@ -36,27 +36,32 @@ def readMapping(host, guest, mapfile):
         host    (Tree): The host tree
         guest   (Tree): The guest tree
         mapfile (str ): Name of the file containing mapping between host and guest nodes
+                        If None, mapping is inferred from host and guest node names
 
     Output:
         nodeMap (dict): A mapping of host -> [guest] nodes
     """
 
-    nodemap = {}
-    for node in host.traverse():
-        nodemap[node] = []
+    if mapfile is not None:
+        nodemap = {}
+        for node in host.traverse():
+            nodemap[node] = []
 
-    nodemapFile = list(open(mapfile))
+        nodemapFile = list(open(mapfile))
 
-    for line in nodemapFile:
-        line = line.split()
-        hostNode = host&line[0]
-        mapped = []
-        for guestName in line[1:]:
-            guestNode = guest&guestName
-            mapped.append(guestNode)
-        nodemap[hostNode] = mapped
+        for line in nodemapFile:
+            line = line.split()
+            hostNode = host&line[0]
+            mapped = []
+            for guestName in line[1:]:
+                guestNode = guest&guestName
+                mapped.append(guestNode)
+            nodemap[hostNode] = mapped
 
-    return nodemap
+        return nodemap
+
+    else:
+        pass
 
 def writeMapping(nodemap, filename):
     """
