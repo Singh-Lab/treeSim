@@ -23,15 +23,26 @@ class TestTreeSearch(unittest.TestCase):
     def tearDown(self):
         pass
 
+    def testReconcileDL(self):
+        cost, mapping = reconcileDL(self.host2, self.guest2, self.map2)
+        namemap = {}
+        for key in mapping:
+            namemap[key.name] = mapping[key].name
+
+        self.assertEqual(cost, 13)
+        self.assertEqual(namemap, {'1':"A",'2':"C",'3':"A",'4':"C",'5':"B",'6':"B",'7':"C",'8':"C",'9':"B",'10':"C",'11':"C"})
+
     def testReconcile(self):
         cost, mapping = reconcile(self.host2, self.guest2, self.map2)
         namemap = {}
         for key in mapping:
             namemap[key.name] = mapping[key].name
-        self.assertEqual(cost, 7)
-        self.assertEqual(namemap, {'1':"A",'2':"C",'3':"A",'4':"C",'5':"B",'6':"B",'7':"C",'8':"C",'9':"A",'10':"C",'11':"C"})
 
+        self.assertEqual(cost, 11)
+        self.assertEqual(namemap, {'1':"A",'2':"C",'3':"A",'4':"C",'5':"B",'6':"B",'7':"C",'8':"C",'9':"C",'10':"C",'11':"C"})
 
+if __name__ == '__main__':
+    unittest.main()
 """
 import HostTreeGen, GuestTreeGen
 from Utils import printProgressBar

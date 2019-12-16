@@ -282,6 +282,7 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
     """
 
     bestTree = guest
+    bestScore = reconcileDL(host, guest, leafmap)
 
     #Base nodemap on names, not actual nodes
     nodemap = {}
@@ -293,9 +294,36 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
         sprs = pick_sprs(guest, 100)
         scores = raxml_score(bestTree, sprs, sequences)
         good_trees = [sprs[i] for i in range(len(sprs)) if scores[i] == 0]
+        logging.debug('Found ' + str(len(good_trees)) + ' close trees')
+
+        rec_scores = []
+        for i in range(len(good_trees)):
+            tree = good_trees[i]
+            lmap = {}
+            for node in tree:
+                lmap[node] = host&(nodemap[node.name])
+            good_trees[i] = reroot(host, tree, lmap, reconcileDL) #Maybe use reconcile() instead? (Test performance)
+
+            tree = good_trees[i]
+            lmap = {}
+            for node in tree:
+                lmap[node] = host&(nodemap[node.name])
+            rec_scores.append(reconcileDL(host, tree, leafmap)[0]) #Replace this with reconcile() after testing
+
+        index = np.argmax(rec_scores)
+        newScore = rec_scores[index]
+
+        if newScore <= bestScore:
+            logging.debug('Did not find a better tree')
+        else:
+            logging.debug('Found better tree, new: ' + str(newScore) + ' old: ' + str(bestScore))
+            bestTree = good_trees[index]
+            bestScore = newScore
+
+    return bestTree
         
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG, format="%(asctime)15s %(message)s")
     logging.info('This is a logging test')
     t = Tree('RAxML_bestTree.out')
     t.set_outgroup(t.get_midpoint_outgroup())
@@ -304,5 +332,4 @@ if __name__ == '__main__':
     logging.info('found %s sprs', str(len(a)))
     logging.info(str(raxml_score(t, a, seqs)))
 
-    #Test Reconciliation Modules
-
+    #perform_search(seqs, a, t, )
