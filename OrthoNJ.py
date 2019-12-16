@@ -164,7 +164,7 @@ def createOrthoTree(hostTree, names, sequences, filename):
     """
 
     host = readTree(hostTree)
-    hmmfile = CP.hmmfile #pylint: disable=no-member
+    hmmfile = CP.HMM_FILE #pylint: disable=no-member
     
     grouped, domNames = groupDomains(names, sequences, hmmfile)
     grouped = np.asarray(grouped).T
