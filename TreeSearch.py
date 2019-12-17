@@ -324,12 +324,21 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
         
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG, format="%(asctime)15s %(message)s")
-    logging.info('This is a logging test')
-    t = Tree('RAxML_bestTree.out')
-    t.set_outgroup(t.get_midpoint_outgroup())
-    seqs = 'ENSG00000196724.fa'
-    a = pick_sprs(t, 100)
-    logging.info('found %s sprs', str(len(a)))
-    logging.info(str(raxml_score(t, a, seqs)))
 
-    #perform_search(seqs, a, t, )
+    logging.info('Reading Input Trees')
+    host = Tree('host.nwk')
+    guest = Tree('RAxML_bestTree.nwk')
+    realGuest = Tree('guest.nwk')
+    sequences = 'sequences.fa'
+    host.set_outgroup(host.get_midpoint_outgroup())
+    seqs = 'sequences.fa'
+
+    logging.info('Generating Mapping')
+    lmap = {}
+    gnames = [node.name for node in guest]
+    for gname in gnames:
+        hname = 'h' + gname.split("_")[0][1:]
+        lmap[guest&gname] = host&hname
+
+    logging.info('Initializing Tree Search Test')
+    perform_search(sequences, host, guest, lmap)
