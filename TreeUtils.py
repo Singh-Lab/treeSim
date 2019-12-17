@@ -232,7 +232,8 @@ def raxml(infile, outext):
     outext (str): output file extension to use. Output tree will be at
                   RAxML_bestTree.<outext>
     """
-    command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 -s '
+    #command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 -s '
+    command = 'raxml -s '
     command += infile + ' -n ' + outext + ' -m PROTGAMMAJTT -T 8 -p ' + str(np.random.randint(2000))
     command += ' > raxml_log.txt'
     os.system(command)
@@ -253,7 +254,8 @@ def raxml_score_from_file(benchfile, testfile, seqfile):
                    significantly worse than the benchmark or not.
     """
     #Run RAxML to find if tree in benchfile is significantly better than those in testfile
-    command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 '
+    #command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 '
+    command = 'raxml '
     #Switch to -f h if this takes too long
     command += '-f H -t' + benchfile + ' -z ' + testfile + ' -s ' + seqfile + ' -m PROTGAMMAJTT -T 8 -n sco'
     command += ' > raxml_log.txt' 

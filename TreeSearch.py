@@ -62,7 +62,6 @@ def pick_spr(tree):
     invalid = set([i for i in subtree.traverse()])
     remaining = set(nodes) - invalid
     ns = np.random.choice(list(remaining))
-    print 'subtree', subtree.name, 'ns', ns.name
     spr(tree, subtree, ns)
     return (subtree.label, ns.label)
 
@@ -131,7 +130,6 @@ def generate_rootings(tree):
             continue
         temp = copy.copy()
         temp.set_outgroup(temp&(node.name))
-        print temp.get_ascii()
         trees.append(temp)
 
     return trees
@@ -250,7 +248,6 @@ def reroot(host, guest, leafmap, recModule=reconcile):
     The rooting of the guest tree with the lowest reconciliation cost.
     """
     trees = generate_rootings(guest)
-    print len(trees)
     costs = []
 
     copy = guest.copy()
@@ -282,7 +279,7 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
     """
 
     bestTree = guest
-    bestScore = reconcileDL(host, guest, leafmap)
+    bestScore = reconcileDL(host, guest, leafmap)[0]
 
     #Base nodemap on names, not actual nodes
     nodemap = {}
@@ -290,7 +287,7 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
         nodemap[node.name] = leafmap[node].name
 
     for iteration in range(num_iter):
-        logging.debug('Iteration number ' + str(iteration))
+        logging.info('Iteration number ' + str(iteration))
         sprs = pick_sprs(guest, 100)
         scores = raxml_score(bestTree, sprs, sequences)
         good_trees = [sprs[i] for i in range(len(sprs)) if scores[i] == 0]
@@ -298,6 +295,7 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
 
         rec_scores = []
         for i in range(len(good_trees)):
+            logging.debug('evaluated tree ' + str(i))
             tree = good_trees[i]
             lmap = {}
             for node in tree:
@@ -308,29 +306,29 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
             lmap = {}
             for node in tree:
                 lmap[node] = host&(nodemap[node.name])
-            rec_scores.append(reconcileDL(host, tree, leafmap)[0]) #Replace this with reconcile() after testing
+            rec_scores.append(reconcile(host, tree, lmap)[0]) #Replace this with reconcile() after testing
 
-        index = np.argmax(rec_scores)
+        index = np.argmin(rec_scores)
         newScore = rec_scores[index]
 
-        if newScore <= bestScore:
+        if newScore >= bestScore:
             logging.debug('Did not find a better tree')
         else:
-            logging.debug('Found better tree, new: ' + str(newScore) + ' old: ' + str(bestScore))
+            logging.info('Found better tree, new: ' + str(newScore) + ' old: ' + str(bestScore))
             bestTree = good_trees[index]
             bestScore = newScore
 
     return bestTree
         
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format="%(asctime)15s %(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(asctime)15s %(message)s")
 
     logging.info('Reading Input Trees')
     host = Tree('host.nwk')
     guest = Tree('RAxML_bestTree.nwk')
     realGuest = Tree('guest.nwk')
     sequences = 'sequences.fa'
-    host.set_outgroup(host.get_midpoint_outgroup())
+    guest.set_outgroup(guest.get_midpoint_outgroup())
     seqs = 'sequences.fa'
 
     logging.info('Generating Mapping')
@@ -340,5 +338,13 @@ if __name__ == '__main__':
         hname = 'h' + gname.split("_")[0][1:]
         lmap[guest&gname] = host&hname
 
+    realMap = {}
+    gnames = [node.name for node in guest]
+    for gname in gnames:
+        hname = 'h' + gname.split("_")[0][1:]
+        realMap[realGuest&gname] = host&hname
+    realScore = reconcile(host, realGuest, realMap)[0]
+    logging.info('Actual Score: ' + str(realScore))
+
     logging.info('Initializing Tree Search Test')
-    perform_search(sequences, host, guest, lmap)
+    bestTree = perform_search(sequences, host, guest, lmap, 5)
