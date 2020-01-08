@@ -6,7 +6,7 @@ import os
 import logging
 from ilp_generator import *
 from gurobipy import *
-from TreeUtils import raxml, raxml_score
+from TreeUtils import raxml, raxml_score, writeReconciliation
 
 def spr(tree, subtree, new_sibling):
     """
@@ -35,6 +35,7 @@ def spr(tree, subtree, new_sibling):
     #Remove subtree from its current location
     old_parent = subtree.up
     subtree.up = temp
+    temp.name = old_parent.name
 
     #Remove old parent
     ancestor = old_parent.up
@@ -51,6 +52,7 @@ def spr(tree, subtree, new_sibling):
 
 def pick_spr(tree):
     """
+    ASSUMES INPUT TREE IS ROOTED
     Picks (and performs) a random spr move by picking a subtree to move 
     and a location to move it to
 
@@ -219,16 +221,16 @@ def reconcileDL(host, guest, leafmap):
             cost += 2
         #CASE 3: either lchild or rchild is mapped to the same but not the other (DUPLOSS)
         elif myhost == lchild:
-            cost += 2 + myhost.get_distance(rchild)
+            cost += 2 + myhost.get_distance(rchild, topology_only=True) + 1
         elif myhost == rchild:
-            cost += 2 + myhost.get_distance(lchild)
+            cost += 2 + myhost.get_distance(lchild, topology_only=True) + 1
         #CASE 4: Neither child is mapped to myhost (SPECIATION + LOSS)
         else:
-            cost += myhost.get_distance(rchild) + myhost.get_distance(lchild) - 2
+            cost += myhost.get_distance(rchild, topology_only=True) + myhost.get_distance(lchild, topology_only=True)
 
     return cost, fullmap
 
-def reroot(host, guest, leafmap, recModule=reconcile):
+def reroot(host, guest, leafmap, recModule=reconcileDL):
     """
     Roots the input guest tree by checking all possible rootings for the lowest 
     reconciliation score. If the midpoint rooting has the lowest possible score,
@@ -250,9 +252,13 @@ def reroot(host, guest, leafmap, recModule=reconcile):
     trees = generate_rootings(guest)
     costs = []
 
+    """
     copy = guest.copy()
+    if len(copy.children) == 2:
+        copy.unroot()
     copy.set_outgroup(copy.get_midpoint_outgroup())
     trees.append(copy)
+    """
     
     for tree in trees:
         #Generate new mapping
@@ -289,7 +295,7 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
     for iteration in range(num_iter):
         logging.info('Iteration number ' + str(iteration))
         sprs = pick_sprs(guest, 100)
-        scores = raxml_score(bestTree, sprs, sequences)
+        scores = raxml_score(bestTree, sprs, sequences)[1]
         good_trees = [sprs[i] for i in range(len(sprs)) if scores[i] == 0]
         logging.debug('Found ' + str(len(good_trees)) + ' close trees')
 
@@ -306,12 +312,12 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
             lmap = {}
             for node in tree:
                 lmap[node] = host&(nodemap[node.name])
-            rec_scores.append(reconcile(host, tree, lmap)[0]) #Replace this with reconcile() after testing
+            rec_scores.append(reconcileDL(host, tree, lmap)[0]) #Replace this with reconcile() after testing
 
         index = np.argmin(rec_scores)
         newScore = rec_scores[index]
 
-        if newScore >= bestScore:
+        if newScore > bestScore:
             logging.debug('Did not find a better tree')
         else:
             logging.info('Found better tree, new: ' + str(newScore) + ' old: ' + str(bestScore))
@@ -343,7 +349,7 @@ if __name__ == '__main__':
     for gname in gnames:
         hname = 'h' + gname.split("_")[0][1:]
         realMap[realGuest&gname] = host&hname
-    realScore = reconcile(host, realGuest, realMap)[0]
+    realScore = reconcileDL(host, realGuest, realMap)[0]
     logging.info('Actual Score: ' + str(realScore))
 
     logging.info('Initializing Tree Search Test')
