@@ -13,6 +13,39 @@ def readTree(filename):
     """
     return Tree(filename, format=1)
 
+def writeReconciliation(host, guest, mapping):
+    """Writes out a basic output version of the input trees and mapping without any
+    information from the trees in nwk format, and writes a guest -> host mapping file.
+    Automatically names all nodes that do not have a name.
+    """
+    os.system('mkdir output')
+
+    i=20
+    for node in host.traverse():
+        if node.name == '':
+            node.name = str(i)
+            i += 1
+
+    i=20
+    for node in guest.traverse():
+        if node.name == '':
+            node.name = str(i)
+            i += 1
+
+    f = open('output/host.nwk','w')
+    f.write(host.write(format=1)[:-1] + host.name + ';')
+    f.close()
+
+    g = open('output/guest.nwk','w')
+    g.write(guest.write(format=1)[:-1] + guest.name + ';')
+    g.close()
+
+    mapfile = open('output/mapping.txt','w')
+    for key in mapping:
+        out = key.name + '\t' + mapping[key].name
+        mapfile.write(out + '\n')
+    mapfile.close()
+
 def writeTree(tree, filename):
     """Writes an ete3 tree to the given filename in NHX format"""
     output = tree.write(format=1, features=[])[:-1]
@@ -250,15 +283,16 @@ def raxml_score_from_file(benchfile, testfile, seqfile):
     seqfile   (str): path to fasta file containing leaf sequences
 
     Output:
-    scores (list): A list of 0/1 entries specifying whether or not each tree is
-                   significantly worse than the benchmark or not.
+    scores (list): The list of ML scores given by raxml for each input tree
+    worse  (list): A list of 0/1 entries specifying whether or not each tree is
+                   significantly worse than the benchmark or not. 
     """
     #Run RAxML to find if tree in benchfile is significantly better than those in testfile
     #command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 '
     command = 'raxml '
     #Switch to -f h if this takes too long
     command += '-f H -t' + benchfile + ' -z ' + testfile + ' -s ' + seqfile + ' -m PROTGAMMAJTT -T 8 -n sco'
-    command += ' > raxml_log.txt' 
+    command += ' > raxml_log.txt'
     #TODO: Read results and select tree
     os.system(command)
 
@@ -271,14 +305,17 @@ def raxml_score_from_file(benchfile, testfile, seqfile):
 
     f = f[start+3:]
     scores = []
+    worse = []
     for line in f:
         if 'Tree: ' not in line:
             continue
+        score = float(line.split()[3])
+        scores.append(score)
         answer = line.split('Significantly Worse: ')[1].split()[0]
-        scores.append(1 if answer == 'Yes' else 0)
+        worse.append(1 if answer == 'Yes' else 0)
 
     os.system('rm *.sco')
-    return scores
+    return scores, worse
 
 def raxml_score(benchTree, testTrees, seqfile):
     """
@@ -293,8 +330,9 @@ def raxml_score(benchTree, testTrees, seqfile):
     seqfile   (str): path to fasta file containing leaf sequences
 
     Output:
-    scores (list): A list of 0/1 entries specifying whether or not each tree is
-                   significantly worse than the benchmark or not.
+    scores (list): The list of ML scores given by raxml for each input tree
+    worse  (list): A list of 0/1 entries specifying whether or not each tree is
+                   significantly worse than the benchmark or not. 
     """
     g = open('bestTree.nwk', 'w')
     g.write(benchTree.write(format = 9) + '\n')
@@ -305,8 +343,8 @@ def raxml_score(benchTree, testTrees, seqfile):
         g.write(tree.write(format=9) + '\n')
     g.close()
 
-    scores = raxml_score_from_file('bestTree.nwk', 'otherTrees.nwk', seqfile)
+    scores, worse = raxml_score_from_file('bestTree.nwk', 'otherTrees.nwk', seqfile)
     os.system('rm bestTree.nwk')
     os.system('rm otherTrees.nwk')
 
-    return scores
+    return scores, worse
