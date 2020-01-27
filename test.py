@@ -18,7 +18,7 @@ from ConfigParser import ConfigParser as CP
 
 #eppath = '/home/caluru/Documents/shilpa/treeSimulation/simulation/zf_shilpa_probabilities.pickle'
 eppath = CP.EP_PATH #pylint: disable=no-member
-transmat = CP.PAM #pylint: disable=no-member
+transmat = pickle.load(open(CP.TRANSMAT)) #pylint: disable=no-member
 emissionProbs = pickle.load(open(eppath))
 hmmfile = CP.HMM_PATH #pylint: disable=no-member
 
@@ -153,7 +153,7 @@ def noHost(samples):
 def withHost():
     sd = 1 #startingDomains
 
-    hostTree = createRandomTopology(4, .5, lambda x: x)
+    hostTree = createRandomTopology(6, .3, lambda x: x)
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .1, gaussNoise, sd)
 
     hostTree.write(outfile='host.nwk')
@@ -346,7 +346,7 @@ def treeSearchTest(n=100):
     ospr_rscores = [reconcileDL(host, g, genMap(host, g))[0] for g in one_spr]
 
     #Score RAxML Tree/Guest Tree
-    print "Finishing Up"
+    print "Finishing Up 12 (???)"
     raxml_rscore = reconcileDL(host, raxml_tree, genMap(host, raxml_tree))[0]
     guest_rscore = reconcileDL(host, guest, genMap(host, guest))[0]
     
@@ -361,8 +361,92 @@ def treeSearchTest(n=100):
     plt.legend((a,b,c,d),('random','real','1SPR','RAxML best'))
     plt.show()
 
+def emMatTest(bl=1):
+    from CreateSequences import genTransitionMatrix
+    from matplotlib import pyplot as plt
+    from scipy.linalg import expm
+    import seaborn as sns
+    sns.set()
+    
+    eps = pickle.load(open(CP.EP_PATH)) #pylint:disable=no-member
+    transmat = pickle.load(open(CP.TRANSMAT)) #pylint:disable=no-member
+
+    outs = genTransitionMatrix(eps, transmat, bl)
+    transmat = expm(transmat * bl)
+
+    for i in range(20):
+        transmat[i][i] /= 10
+    transmat = [i / sum(i) for i in transmat]
+
+    i = 0
+    for (ep, out) in zip(eps, outs):
+        plt.figure(figsize=(16,4))
+        plt.subplot(1, 3, 1)
+        sns.heatmap(transmat, cmap='viridis')
+        plt.title('Original Transition Matrix')
+
+        plt.subplot(1, 3, 2)
+        sns.heatmap([ep], cmap='viridis')
+        plt.title('Mask (Position ' + str(i) + ")")
+
+        plt.subplot(1, 3, 3)
+        sns.heatmap(out, cmap='viridis')
+        plt.title('Output')
+
+        plt.show()
+        i += 1
+
+def seqGenTest(n=500, bl=1):
+
+    failcount = 0
+
+    for i in range(n):
+        seq = grs(5)
+        try:
+            evolveSequence(seq, .1, bl, emissionProbs, hmmfile, transmat)
+        except ValueError:
+            failcount += 1
+        suff = str(failcount) + ' / ' + str(i+1) + ' failures'
+        printProgressBar(i+1, n, suffix=suff)
+
+def seqDiff(n=10, bl=1):
+
+    RED = '\033[91m'
+    NORMAL = '\033[0m'
+
+    seq = grs(1)
+    dom = findDomains(seq, hmmfile)[2][0]
+    print dom
+
+    iterations = 0
+    while iterations < n:
+        try:
+            temp = evolveSequence(seq, .05, bl, emissionProbs, hmmfile, transmat)
+            tempdom = findDomains(temp, hmmfile)[2][0]
+            out = ""
+            nMuts = 0
+            for i in range(len(dom)):
+                if tempdom[i] == dom[i]:
+                    out += tempdom[i]
+                else:
+                    out += RED + tempdom[i] + NORMAL
+                    nMuts += 1
+            totalMuts = 0
+            for i in range(len(temp)):
+                if temp[i] != seq[i]:
+                    totalMuts += 1
+            print out, nMuts, totalMuts, round(totalMuts / float(nMuts) / (len(temp) / 23.))
+        except:
+            continue
+        iterations += 1
+
+
 if __name__ == "__main__":
     print datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '\n'
     #host, guest, names, seqs = withHost()
     treeSearchTest()
+    #emMatTest()
+    #for bl in [.1, .25, .5, .75, 1]:
+        #seqGenTest(100, bl)
+    #seqDiff(bl=.5)
     print '\n', datetime.now().strftime('%Y-%m-%d %H:%M:%S')
