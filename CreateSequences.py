@@ -8,6 +8,7 @@ from stats import exp, drawFromDiscrete
 from math import log
 from pyvolve import Model, Partition, Evolver, read_tree
 from OrthoAnalysis import selfSimilarity
+from scipy.linalg import expm
 
 #####################################
 #                                   #
@@ -67,8 +68,37 @@ def remove(sequence, hmmfile, domNumber):
 alphabet = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 
                 'T', 'V', 'W', 'Y']
 
-#Performs evolutionary process on a domain according to its hmm. Currently assumes zf_shilpa
-def evolveDomain(sequence, rate, branchLength, emissionProbs):
+def genTransitionMatrix(emissionProbs, transmat, branchLength):
+    """
+    Uses emission probabilities to re-weight transition matrix.
+    Generates one transition matrix per position in the list of emission probabilities
+
+    Args:
+        emissionProbs (list): matrix with dimensions (n x 20) where n is the length of 
+                              the domain. Each row contains the probability of each 
+                              aa appearing at that position (in pfam hmm order)
+        transmat (list):      aa transition matrix with dimensions (20 x 20)
+    """
+
+    #Turn into transition matrix
+    transmat = np.asarray(transmat)
+    transmat *= branchLength
+    transmat = expm(transmat)
+    
+    #Zero out probability of staying in the same place
+    for i in range(len(transmat)):
+        transmat[i][i] = 0
+    transmat = [i / sum(i) for i in transmat]
+    
+    out = []
+    for position in emissionProbs:
+        temp = [np.multiply(position, i) for i in transmat]
+        temp = [i / sum(i) for i in temp]
+        out.append(temp)
+
+    return out
+
+def evolveDomain(sequence, rate, branchLength, emissionProbs, transmat, hmmfile):
     """
     Performs evolutionary process on a domain according to its hmm. Currently assumes zf_shilpa
 
@@ -79,6 +109,7 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs):
         emissionsProbs (list): matrix with dimensions (n x 20) where n is the length of 
                                the domain. Each row contains the probability of each 
                                aa appearing at that position (in pfam hmm order)
+        transmat (list):       aa transition matrix with dimensions (20 x 20) 
     """
 
     invalid = True
@@ -92,27 +123,36 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs):
             t -= exp(rate)
         return count
 
-    #information content of a probability distribution
-    def ic(line):
-        return [-1 * p * log(p) for p in line]
+    #Entropy of a probability distribution
+    def entropy(line):
+        return [-1 * p * log(p, 2) for p in line]
 
-    ics = [sum(ic(i)) for i in emissionProbs]
-    ics = ics / sum(ics)
+    entropies = [sum(entropy(i)) for i in emissionProbs]
+    entropies = entropies / sum(entropies)
+
+    #TODO: change so we only generate matrices for the required positions?
+    transitions = genTransitionMatrix(emissionProbs, transmat, branchLength)
         
     nMuts = numMutations(branchLength)
     invalidCounter = 0
     while invalid:
         seqCopy = sequence
         for i in range(nMuts):
-            position = drawFromDiscrete(ics)
-            character = drawFromDiscrete(emissionProbs[position])
+            #position = drawFromDiscrete(entropies)
+            #character = drawFromDiscrete(emissionProbs[position])
+            
+            position = np.random.choice(range(len(seqCopy)))
+            oldChar = alphabet.index(sequence[position])
+            row = transitions[position][oldChar]
+            character = drawFromDiscrete(row)
+            
             seqCopy = seqCopy[:position] + alphabet[character] + seqCopy[position+1:]
-        invalid = not isValid(seqCopy)
+        invalid = not isValid(seqCopy, hmmfile)
         invalidCounter += 1
         if invalidCounter >= 25:
             raise ValueError
 
-    #assert(isValid(seqCopy))
+    #print (position, alphabet[oldChar], alphabet[character]),
     return seqCopy
 
 def evolveLinker(sequence, branchLength):
@@ -136,16 +176,17 @@ def evolveEmptyLinker(branchLength):
 
 #Simulates evolution of a full sequence including both domains and linker regions
 #Splits sequence into domain and linker regions, deals with each independently
-def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile):
+def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile, transmat):
     """
     Putting the previous steps together, simulates evolutoin of a full sequence including 
     both domains and non-domain sequence. 
 
     Args:
-        sequence (str): The full sequence to be evolved
-        emissionsProbs: matrix with dimensions (n x 20) where n is the length of 
-                        the domain. Each row contains the probability of each 
-                        aa appearing at that position (in pfam hmm order) 
+        sequence (str):  The full sequence to be evolved
+        emissionsProbs:  matrix with dimensions (n x 20) where n is the length of 
+                         the domain. Each row contains the probability of each 
+                         aa appearing at that position (in pfam hmm order) 
+        transmat (list): aa transition matrix with dimensions (20 x 20)
     """
 
     #Find domains, check if sequence begins and/or ends with a domain
@@ -158,7 +199,7 @@ def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile):
 
     #Evolve sequence fragments individually
     for i in range(len(domains)):
-        domains[i] = evolveDomain(domains[i], rate, branchLength, emissionProbs)
+        domains[i] = evolveDomain(domains[i], rate, branchLength, emissionProbs, transmat, hmmfile)
 
     for i in range(len(sequences)):
         if sequences[i] == '':
@@ -176,7 +217,7 @@ def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile):
     return sequence
 
 #TODO: Need a better name for this function
-def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
+def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename, transmat):
     """
     Evolves sequence along domain subtree within a single host node. Assumes that every
     node in the domain tree has an event assigned. Requires that every root has a position
@@ -205,7 +246,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
         workingSet.remove(node)
         if dist > 0:
             #print 'evolving for:', dist, '\n'
-            sequence = evolveSequence(sequence, rate, dist, emissionProbs, hmmfile)
+            sequence = evolveSequence(sequence, rate, dist, emissionProbs, hmmfile, transmat)
 
         #node.domain = seqs[node.position]
 
@@ -265,7 +306,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename):
 
     return sequence
 
-def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProbs):
+def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProbs, transmat):
     """
     Evolves a root sequence along an entire host tree, taking into account the domain level 
     events present in the guest tree (duplication, loss, speciation)
@@ -289,8 +330,8 @@ def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProb
 
         #No events occured at this node
         if hostNode not in reverseMap:
-            hostNode.sequence = evolveSequence(tempSequence, 0.1, hostNode.dist, \
-                                    emissionProbs, hmmfile)
+            hostNode.sequence = evolveSequence(tempSequence, 0.05, hostNode.dist, \
+                                    emissionProbs, hmmfile, transmat)
             continue
 
         allGuestNodes = reverseMap[hostNode]
@@ -319,7 +360,7 @@ def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProb
             t = guest
 
         #Actually do the work
-        tempSequence = domainOrder(tempSequence, 0.1, hmmfile, emissionProbs, t, hostNode.name)
+        tempSequence = domainOrder(tempSequence, 0.1, hmmfile, emissionProbs, t, hostNode.name, transmat)
         hostNode.sequence = tempSequence
 
         #Reconnect all root and leaf nodes to the rest of the guest tree
@@ -335,10 +376,12 @@ if __name__ == '__main__':
     from stats import gaussNoise
     from rootSequence import genRandomSequence2 as grs
     import pickle
+    from ConfigParser import ConfigParser as CP
 
-    eppath = '/home/caluru/Documents/shilpa/treeSimulation/simulation/zf_shilpa_probabilities.pickle'
+    #eppath = '/home/caluru/Documents/shilpa/treeSimulation/simulation/zf_shilpa_probabilities.pickle'
+    eppath = CP.EP_PATH #pylint: disable=no-member
     emissionProbs = pickle.load(open(eppath))
-    hmmfile = '/home/caluru/Data/hmmfiles/zf_shilpa_232.hmm'
+    hmmfile = CP.HMM_PATH #pylint: disable=no-member
 
     def s2(x):
         denom = 1 + exp(10-x) if x < 10 else 1
@@ -357,5 +400,6 @@ if __name__ == '__main__':
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .2, gaussNoise, sd)
 
     rootSequence = grs(sd)
-    evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs)
+    transmat = CP.TRANSMAT #pylint: disable=no-member
+    evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs, transmat)
     selfSimilarity('asdf', hostTree.sequence, hmmfile, True) #pylint: disable=no-member
