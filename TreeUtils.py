@@ -250,10 +250,17 @@ def printDomSeq(sequence, hmmfile, minimal_rep = False):
 
     print out
 
-def isValid(domain):
+def isValid(domain, hmmfile):
     """Checks if the input string is a valid zf-C2H2 domain"""
+
+    #Can HMMER find it?
+    seqs = findDomains(domain, hmmfile)[2]
+    if len(seqs) > 0 and domain != seqs[0]:
+        return False
+
     valid = len(domain) == 23 and domain[2] == "C" and domain[5] == "C"
     valid &= domain[18] == "H" and domain[22] == "H"
+
     return valid
 
 def raxml(infile, outext):
