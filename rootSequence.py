@@ -11,6 +11,15 @@ import string
 DATAPATH = CP.ORTHOGROUP_PATH #pylint: disable=no-member
 hmmfile = CP.HMM_PATH #pylint: disable=no-member
 
+def fixzf(dom):
+    #Adds in the C's and H's if they aren't there
+    dom = list(dom)
+    dom[2] = "C"
+    dom[5] = "C"
+    dom[18] = "H"
+    dom[22] = "H"
+    return ''.join(dom)
+
 #TODO: Bug causing more domains than required occasionally (grs2 works normally).
 def genRandomSequence(numDoms):
     """
@@ -40,8 +49,11 @@ def genRandomSequence(numDoms):
 
     newSeq = prefix + middle + suffix
     newSeq = ''.join(newSeq.split('-'))
+
     #Deletes all lowercase letters
     newSeq = newSeq.translate(None, string.ascii_lowercase)
+    #Deletes all illegal AA characters
+    newSeq = newSeq.translate(None, 'BJOUXZ')
 
     return newSeq
 
@@ -70,16 +82,17 @@ def genRandomSequence2(numDoms):
         return genRandomSequence2(numDoms)
 
     i,j = starts[0], starts[1]
-    middle = pool[0][i:j]
+    middle = fixzf(pool[0][i:j])
 
     for sequence in pool[1:]:
         starts = findDomains(sequence, hmmfile)[0]
         i, j = starts[0], starts[1]
-        middle += sequence[i:j]
+        middle += fixzf(sequence[i:j])
 
     newSeq = prefix + middle + suffix
     newSeq = newSeq.translate(None, '-') #''.join(newSeq.split('-'))
     newSeq = newSeq.translate(None, string.ascii_lowercase)
+    newSeq = newSeq.translate(None, 'BJOUXZ')
 
     return newSeq
 
