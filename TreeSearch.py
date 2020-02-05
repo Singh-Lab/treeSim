@@ -17,38 +17,100 @@ def spr(tree, subtree, new_sibling):
     tree (Tree): The full tree in which to perform an spr move
     subtree (Tree): The subtree that will be pruned and grafted
     new_sibling (Tree): The new sibling of the subtree being moved
+
+    >>> t = Tree('((A,D),(B,C));')
+    >>> subtree = t&"A"
+    >>> new_sibling = t&"B"
+    >>> t = spr(t, subtree, new_sibling)
+    >>> newtree = Tree('(D,(C,(B,A)));')
+    >>> rf = newtree.robinson_foulds(t)[0]
+    >>> assert(rf == 0)
     """
     
-    if subtree == tree or subtree.up == tree:
-        return
+    if tree == subtree:
+        raise ValueError
+    if subtree == new_sibling or subtree.up == new_sibling:
+        raise ValueError
+    if subtree.up == new_sibling.up:
+        raise ValueError
+    if tree.get_common_ancestor(subtree, new_sibling) == subtree:
+        raise ValueError
 
-    #Add node between new_sibling and its parent
-    temp = Tree()
-    temp.up = new_sibling.up
-    temp.children = [subtree, new_sibling]
-    new_sibling.up = temp
-    if temp.up.children[0] == new_sibling:
-        temp.up.children[0] = temp
+    #CASE 1 (int -> int):
+    if subtree.up != tree and new_sibling != tree:
+        #Add node between new_sibling and its parent
+        temp = Tree()
+        temp.up = new_sibling.up
+        temp.children = [subtree, new_sibling]
+        new_sibling.up = temp
+        if temp.up.children[0] == new_sibling:
+            temp.up.children[0] = temp
+        else:
+            temp.up.children[1] = temp
+
+        #Remove subtree from its current location
+        old_parent = subtree.up
+        subtree.up = temp
+        temp.name = old_parent.name
+
+        #Remove old parent
+        ancestor = old_parent.up
+        if old_parent.children[0] == subtree:
+            other_child = old_parent.children[1]
+        else:
+            other_child = old_parent.children[0]
+
+        other_child.up = ancestor
+        if ancestor.children[0] == old_parent:
+            ancestor.children[0] = other_child
+        else:
+            ancestor.children[1] = other_child
+
+    #CASE 2 (cor -> int)
+    elif subtree.up == tree:
+
+        old_root = tree
+        if tree.children[0] == subtree:
+            tree = tree.children[1]
+        else:
+            tree = tree.children[0]
+        tree.up = None
+
+        old_root.up = new_sibling.up
+        old_root.children = [subtree, new_sibling]
+        new_sibling.up = old_root
+        if old_root.up.children[0] == new_sibling:
+            old_root.up.children[0] = old_root
+        else:
+            old_root.up.children[1] = old_root
+
+    #CASE 3 (int -> root)
     else:
-        temp.up.children[1] = temp
 
-    #Remove subtree from its current location
-    old_parent = subtree.up
-    subtree.up = temp
-    temp.name = old_parent.name
+        temp = Tree()
+        temp.up = None
+        temp.children = [tree, subtree]
+        tree.up = temp
+        tree = temp
+        temp.name = subtree.up.name
 
-    #Remove old parent
-    ancestor = old_parent.up
-    if old_parent.children[0] == subtree:
-        other_child = old_parent.children[1]
-    else:
-        other_child = old_parent.children[0]
+        old_parent = subtree.up
+        subtree.up = tree
 
-    other_child.up = ancestor
-    if ancestor.children[0] == old_parent:
-        ancestor.children[0] = other_child
-    else:
-        ancestor.children[1] = other_child
+        #Remove old parent
+        ancestor = old_parent.up
+        if old_parent.children[0] == subtree:
+            other_child = old_parent.children[1]
+        else:
+            other_child = old_parent.children[0]
+
+        other_child.up = ancestor
+        if ancestor.children[0] == old_parent:
+            ancestor.children[0] = other_child
+        else:
+            ancestor.children[1] = other_child
+
+    return tree
 
 def pick_spr(tree):
     """
@@ -59,13 +121,19 @@ def pick_spr(tree):
     Arguments:
     tree: The tree to perform a random spr for
     """
-    nodes = [i for i in tree.traverse()][3:]
-    subtree = np.random.choice(nodes)
-    invalid = set([i for i in subtree.traverse()])
-    remaining = set(nodes) - invalid
+    nodes = [i for i in tree.traverse()][1:]
+
+    remaining = set()
+    while len(remaining) == 0:
+        subtree = np.random.choice(nodes)
+        invalid = set([i for i in subtree.traverse()])
+        invalid.add(subtree.up)
+        invalid.update(subtree.up.children)
+        remaining = set([i for i in tree.traverse()]) - invalid
+
     ns = np.random.choice(list(remaining))
-    spr(tree, subtree, ns)
-    return (subtree.label, ns.label)
+    tree = spr(tree, subtree, ns)
+    return tree, (subtree.name, ns.name)
 
 def pick_sprs(tree, n):
     """
@@ -92,9 +160,10 @@ def pick_sprs(tree, n):
     while i < n:
 
         newTree = tree.copy()
-        used = pick_spr(newTree)
+        newTree, used = pick_spr(newTree)
 
         if used not in seen:
+
             seen.add(used)
             sprs.append(newTree)
             i += 1
@@ -294,7 +363,7 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
 
     for iteration in range(num_iter):
         logging.info('Iteration number ' + str(iteration))
-        sprs = pick_sprs(guest, 100)
+        sprs = pick_sprs(guest, 200)
         scores = raxml_score(bestTree, sprs, sequences)[1]
         good_trees = [sprs[i] for i in range(len(sprs)) if scores[i] == 0]
         logging.debug('Found ' + str(len(good_trees)) + ' close trees')
@@ -314,28 +383,85 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
                 lmap[node] = host&(nodemap[node.name])
             rec_scores.append(reconcileDL(host, tree, lmap)[0]) #Replace this with reconcile() after testing
 
+        """
         index = np.argmin(rec_scores)
         newScore = rec_scores[index]
+        """
 
+        #Sort into better, worse
+        betterTrees, worseTrees = [], []
+        betterScores, worseScores = [], []
+
+        for i in range(len(rec_scores)):
+            if rec_scores[i] >= bestScore:
+                worseTrees.append(good_trees[i])
+                worseScores.append(rec_scores[i])
+            else:
+                betterTrees.append(good_trees[i])
+                betterScores.append(rec_scores[i])
+
+        dice_roll = np.random.random()
+        if dice_roll < 0.1 or len(betterTrees) == 0:
+            index = np.random.randint(len(worseTrees))
+            logging.info('Picking a worse tree, new: ' + str(worseScores[index]) + ' old: ' + str(bestScore))
+            bestTree = worseTrees[index]
+            bestScore = worseScores[index]
+        elif dice_roll < 0.2:
+            index = np.random.randint(len(betterTrees))
+            logging.info('Picking a better tree, new: ' + str(betterScores[index]) + ' old: ' + str(bestScore))
+            bestTree = betterTrees[index]
+            bestScore = betterScores[index] 
+        else:
+            index = np.argmin(betterScores)
+            logging.info('Picking best tree, new: ' + str(betterScores[index]) + ' old: ' + str(bestScore))
+            bestTree = betterTrees[index]
+            bestScore = betterScores[index]
+
+        """
         if newScore > bestScore:
             logging.debug('Did not find a better tree')
         else:
             logging.info('Found better tree, new: ' + str(newScore) + ' old: ' + str(bestScore))
             bestTree = good_trees[index]
             bestScore = newScore
+        """
 
     return bestTree
         
 if __name__ == '__main__':
+    from test import withHost
+    from time import time
+    from TreeUtils import raxml_score_from_file, writeTree
+
+    np.random.seed(int(time()/1985))
     logging.basicConfig(level=logging.INFO, format="%(asctime)15s %(message)s")
 
+    #withHost(6, .3)
+
     logging.info('Reading Input Trees')
-    host = Tree('host.nwk')
+    host = Tree('host.nwk', format=1)
+    if host.name == '':
+        host.name = 'h0'
+    realGuest = Tree('guest.nwk', format=1)
+    
+    """
+    #Run RAxML
+    if "RAxML_bestTree.nwk" in os.listdir('.'):
+        os.system('rm RAxML*')
+    raxml('sequences.fa', 'nwk')
+    """
     guest = Tree('RAxML_bestTree.nwk')
-    realGuest = Tree('guest.nwk')
+
+    result = raxml_score_from_file('RAxml_bestTree.nwk', 'guest.nwk', 'sequences.fa')
+    score = result[1][0]
+
+    if score == 0:
+        logging.info('Guest Tree is not significantly worse than Host Tree')
+    else:
+        logging.info('Guest Tree is significantly worse than Host Tree')
+
     sequences = 'sequences.fa'
     guest.set_outgroup(guest.get_midpoint_outgroup())
-    seqs = 'sequences.fa'
 
     logging.info('Generating Mapping')
     lmap = {}
@@ -349,8 +475,37 @@ if __name__ == '__main__':
     for gname in gnames:
         hname = 'h' + gname.split("_")[0][1:]
         realMap[realGuest&gname] = host&hname
+
     realScore = reconcileDL(host, realGuest, realMap)[0]
     logging.info('Actual Score: ' + str(realScore))
 
     logging.info('Initializing Tree Search Test')
-    bestTree = perform_search(sequences, host, guest, lmap, 5)
+    bestTree = perform_search(sequences, host, guest, lmap, 10)
+
+    i = 50
+    for node in bestTree.traverse():
+        if node.name == '':
+            node.name = str(i)
+            i += 1
+    
+    writeTree(bestTree, 'searchtree.nwk')
+
+    def genMap(host, guest):
+        #{guest -> host}
+        nodemap = {}
+        for leaf in guest:
+            hname = 'h' + leaf.name.split("_")[0][1:]
+            nodemap[leaf] = host&hname
+        return nodemap
+
+    cost, rec = reconcileDL(host, bestTree, genMap(host, bestTree))
+
+    print cost
+
+    f = open('searchmap.map','w')
+
+    for key in rec:
+        out = key.name + '\t' + rec[key].name + '\n'
+        f.write(out)
+
+    f.close()
