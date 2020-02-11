@@ -571,8 +571,17 @@ if __name__ == '__main__':
 
     f = open('searchmap.map','w')
 
+    #Write out reconciliation mapping for inferred tree
     for key in rec:
         out = key.name + '\t' + rec[key].name + '\n'
         f.write(out)
 
+    f.close()
+
+    #Write out reconciliation mapping for real guest tree
+    cost, rec = reconcileDL(host, guest, genMap(host, guest))
+    f = open('realmap.map','w')
+    for key in rec:
+        out = key.name + '\t' + rec[key].name + '\n'
+        f.write(out)
     f.close()
