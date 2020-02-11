@@ -117,7 +117,7 @@ def pick_spr(tree):
     ASSUMES INPUT TREE IS ROOTED
     Picks (and performs) a random spr move by picking a subtree to move 
     and a location to move it to
-
+-
     Arguments:
     tree: The tree to perform a random spr for
     """
@@ -190,9 +190,9 @@ def generate_rootings(tree):
     copy.unroot()
 
     #Every node needs a unique name for this to work
-    i = 0
+    i = np.random.randint(32768)
     for node in copy.traverse():
-        if node.name == '':
+        if 'g' not in node.name:
             node.name = str(i)
             i += 1
 
@@ -320,14 +320,6 @@ def reroot(host, guest, leafmap, recModule=reconcileDL):
     """
     trees = generate_rootings(guest)
     costs = []
-
-    """
-    copy = guest.copy()
-    if len(copy.children) == 2:
-        copy.unroot()
-    copy.set_outgroup(copy.get_midpoint_outgroup())
-    trees.append(copy)
-    """
     
     for tree in trees:
         #Generate new mapping
@@ -340,7 +332,7 @@ def reroot(host, guest, leafmap, recModule=reconcileDL):
     index = np.argmin(costs)
     return trees[index]
 
-def perform_search(sequences, host, guest, leafmap, num_iter=100):
+def perform_strict_search(sequences, host, guest, leafmap, num_iter=100):
     """
     Performs a search in tree space surrounding the highest scoring guest 
     tree according to raxml. Tries to find a guest with a similar likelihood 
@@ -427,6 +419,82 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100):
         """
 
     return bestTree
+
+def perform_search(sequences, host, guest, leafmap, num_iter=100, len_search_path=100):
+
+    bestTree = guest
+    bestScore = reconcileDL(host, guest, leafmap)[0]
+    seen = set() #Set of trees already seen by algo
+
+    #Base nodemap on names, not actual nodes
+    nodemap = {}
+    for node in leafmap:
+        nodemap[node.name] = leafmap[node].name
+
+    for iteration in range(num_iter):
+
+        #May change in inner loop, don't change bestScore or bestTree
+        curBestScore = bestScore
+        curBestTree = bestTree
+
+        pool = [curBestTree]
+        costs = [curBestScore]
+        
+        for i in range(len_search_path):
+
+            #Propose new tree
+            newTree, treeHash = pick_spr(curBestTree.copy())
+
+            #Don't waste time on a tree that has already been seen
+            if treeHash in seen:
+                continue
+
+            seen.add(treeHash)
+
+            #Regenerate mapping
+            lmap = {}
+            for node in newTree:
+                lmap[node] = host&(nodemap[node.name])
+
+            #Reroot with low probability
+            if np.random.random() < 0.05:
+                newTree = reroot(host, newTree, lmap, reconcileDL)
+                #Need to redo this because reroot returns a new tree
+                lmap = {}
+                for node in newTree:
+                    lmap[node] = host&(nodemap[node.name])
+
+            rec_score = reconcileDL(host, newTree, lmap)[0]
+
+            pool.append(newTree)
+            costs.append(rec_score)
+
+            if rec_score < curBestScore \
+                or (rec_score == curBestScore and np.random.random() < .5) \
+                or (rec_score > curBestScore and np.random.random() < .1):
+                curBestScore = rec_score
+                curBestTree = newTree
+
+        #Remove any tree that doesn't pass the RAxML threshold
+        raxml_costs = raxml_score(guest, pool, sequences)[1]
+        for i in xrange(len(raxml_costs)-1, -1, -1):
+            if raxml_costs[i] != 0:
+                pool.pop(i)
+                costs.pop(i)
+
+        #pick the best tree for the next iteration
+        index = np.argmin(costs)
+        bestScore = costs[index]
+        bestTree = pool[index]
+
+        logstring = 'Iteration Number ' + str(iteration)  + ": "
+        if index != 0:
+            logstring += "Better tree found, " + str(bestScore)
+        else:
+            logstring += "Better tree not found"
+        logging.info(logstring)
+
+    return bestTree
         
 if __name__ == '__main__':
     from test import withHost
@@ -444,12 +512,11 @@ if __name__ == '__main__':
         host.name = 'h0'
     realGuest = Tree('guest.nwk', format=1)
     
-    """
     #Run RAxML
     if "RAxML_bestTree.nwk" in os.listdir('.'):
         os.system('rm RAxML*')
     raxml('sequences.fa', 'nwk')
-    """
+
     guest = Tree('RAxML_bestTree.nwk')
 
     result = raxml_score_from_file('RAxml_bestTree.nwk', 'guest.nwk', 'sequences.fa')
@@ -480,7 +547,7 @@ if __name__ == '__main__':
     logging.info('Actual Score: ' + str(realScore))
 
     logging.info('Initializing Tree Search Test')
-    bestTree = perform_search(sequences, host, guest, lmap, 10)
+    bestTree = perform_search(sequences, host, guest, lmap, 100)
 
     i = 50
     for node in bestTree.traverse():
