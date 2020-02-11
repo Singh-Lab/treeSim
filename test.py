@@ -150,14 +150,14 @@ def noHost(samples):
 
     f.close()
 
-def withHost():
+def withHost(numLeaves = 4, bl = .5):
     sd = 1 #startingDomains
 
-    hostTree = createRandomTopology(6, .3, lambda x: x)
+    hostTree = createRandomTopology(numLeaves, bl, lambda x: x)
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .1, gaussNoise, sd)
 
-    hostTree.write(outfile='host.nwk')
-    guestTree.children[0].write(outfile='guest.nwk')
+    hostTree.write(outfile='host.nwk', format=1)
+    guestTree.children[0].write(outfile='guest.nwk', format=1)
 
     rootSequence = grs(sd)
     evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs, transmat)
@@ -253,6 +253,105 @@ def createRandomTrees(tree, n=1, outfile=None):
     
     return outtrees
 
+def testLikelihood(checkpoint=False):
+    """
+    Parameter sweep over number of leaves in the host tree vs length of the tree 
+    to see which combinations produce domain trees that are not significantly worse
+    than RAxML_bestTree
+    """
+
+    from TreeSearch import reroot
+    from matplotlib import pyplot as plt
+    import seaborn as sns
+    sns.set()
+
+    def genMap(host, guest):
+        #{guest -> host}
+        nodemap = {}
+        for leaf in guest:
+            hname = 'h' + leaf.name.split("_")[0][1:]
+            nodemap[leaf] = host&hname
+        return nodemap
+
+    def name(tree):
+        i = 100
+        for node in tree.traverse():
+            if node.name == '':
+                node.name = str(i)
+                i += 1
+
+    nLeaves = []
+    bLengths = []
+    colors = [] 
+    available_colors = ["#440154FF", "#404788FF", "#287D8EFF", "#29AF7FFF", "#95D840FF", "#FDE725FF"]
+
+    if not checkpoint:
+        for nl in [4,6,8,10,12]:
+            for bl in np.arange(.05, .55, .05):
+
+                #it = ((nl - 4) + 1) / 2 * 10 + bl / .5 * 5
+                #printProgressBar(it, 10)
+
+                successes = 0
+
+                for _ in range(5):
+
+                    host = None
+                    while host is None:
+                        try:
+                            host, guest, names, seqs = withHost(nl, bl)
+                        except:
+                            continue
+
+                    guest = guest.children[0]
+                    guest.up = None
+                    name(guest)
+                    name(host)
+
+                    f = open('sequences.fa','w')
+                    for i in range(len(names)):
+                        f.write(">" + names[i] + '\n')
+                        f.write(seqs[i] + '\n')
+                    f.close()
+
+                    f = open('host.nwk','w')
+                    f.write(host.write(format=1) + '\n')
+                    f.close()
+
+                    f = open('guest.nwk','w')
+                    f.write(guest.write(format=1) + '\n')
+                    f.close()
+
+                    #Run RAxML
+                    if "RAxML_bestTree.nwk" in listdir('.'):
+                        system('rm RAxML*')
+                    raxml('sequences.fa', 'nwk')
+                    raxml_tree = Tree('RAxML_bestTree.nwk')
+                    name(raxml_tree)
+                    raxml_tree = reroot(host, raxml_tree, genMap(host, raxml_tree))
+
+                    result = raxml_score_from_file('RAxml_bestTree.nwk', 'guest.nwk', 'sequences.fa')
+                    score = result[1][0]
+                    if score == 0:
+                        successes += 1
+
+                print (nl, bl), successes
+
+                colors.append(available_colors[successes])
+                nLeaves.append(nl)
+                bLengths.append(bl)
+        
+        pickle.dump((nLeaves, bLengths, colors), open('plot_data.pickle','w'))
+
+    else:
+        nLeaves, bLengths, colors = pickle.load(open('plot_data.pickle'))
+
+    plt.scatter(nLeaves, bLengths, color=colors)
+    plt.title('Acceptable BL Ranges for Each Host Tree Size')
+    plt.xlabel('# of Host Leaves')
+    plt.ylabel('Branch Length')
+    plt.show()
+
 def treeSearchTest(n=100):
     """
     Tests the effectiveness of the tree search algo in TreeSearch. Produces a plot
@@ -285,7 +384,7 @@ def treeSearchTest(n=100):
 
     #Generate host and guest tree
     print "Generating Trees"
-    host, guest, names, seqs = withHost()
+    host, guest, names, seqs = withHost(6, .3) #Experimentally determined from testLikelihood()
     guest = guest.children[0]
     guest.up = None
     name(guest)
@@ -449,4 +548,5 @@ if __name__ == "__main__":
     #for bl in [.1, .25, .5, .75, 1]:
         #seqGenTest(100, bl)
     #seqDiff(bl=.5)
+    #testLikelihood()
     print '\n', datetime.now().strftime('%Y-%m-%d %H:%M:%S')
