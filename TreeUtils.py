@@ -272,9 +272,13 @@ def raxml(infile, outext):
     outext (str): output file extension to use. Output tree will be at
                   RAxML_bestTree.<outext>
     """
-    #command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 -s '
+
+    #Remove previous run if it exists (RAxML will not clobber existing results)
+    if "RAxML_bestTree.nwk" in os.listdir('.'):
+        os.system('rm RAxML_bestTree.nwk')
+
     command = 'raxml -s '
-    command += infile + ' -n ' + outext + ' -m PROTGAMMAJTT -T 8 -p ' + str(np.random.randint(2000))
+    command += infile + ' -n ' + outext + ' -m PROTGAMMAJTT -T 8 -p ' + str(np.random.randint(2000) + 1)
     command += ' > raxml_log.txt'
     os.system(command)
 
@@ -355,3 +359,40 @@ def raxml_score(benchTree, testTrees, seqfile):
     os.system('rm otherTrees.nwk')
 
     return scores, worse
+
+#TODO: Test this function
+def run_treefix(host, guest, lmap, sequences=False):
+    os.system('mkdir -p treefix/config; mkdir treefix/data')
+
+    if type(host) == str:
+        os.system('cp ' + host + ' tfix/config/host.stree')
+    else:
+        writeTree(host, 'tfix/config/host.stree')
+
+    #guest is a path to a fastq file
+    if sequences:
+        raxml(guest, 'nwk')
+        os.system('cp RAxML_bestTree.nwk tfix/data/0/0.nt.raxml.tree')
+    #guest is a path to a tree file
+    elif type(guest) == str:
+        os.system('cp ' + guest + ' tfix/data/0/0.nt.raxml.tree')
+    
+    #guest is a tree object
+    else:
+        writeTree(host, 'tfix/data/0/0.nt.raxml.tree')
+
+    #Run TreeFix
+    cmd = 'treefix -s tfix/config/genes.stree \
+                -S tfix/config/genes.smap \
+                -A nt.align \
+                -o nt.raxml.tree \
+                -n nt.raxml.treefix.tree \
+                -V 0 \
+                -l data/0/0.nt.raxml.treefix.log \
+                data/0/0.nt.raxml.tree'
+
+    os.system(cmd)
+
+    out = Tree('tfix/data/0/0.nt.raxml.treefix.tree')
+    os.system('rm -r tfix')
+    return out
