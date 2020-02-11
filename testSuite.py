@@ -1,4 +1,3 @@
-#Test suite for HostTreeGen and GuestTreeGen. Change each if statement to true to run that test
 import unittest
 from TreeSearch import reconcile, reconcileDL, generate_rootings
 from ete3 import Tree
@@ -6,8 +5,8 @@ from ete3 import Tree
 class TestTreeSearch(unittest.TestCase):
     
     def setUp(self):
-        self.host1 = Tree('((5:1,4:1)1:1,((1:1,0:1)1:1,2:1)1:1);')
-        self.guest1 = Tree('(((11:1,10:1)1:1,((7:1,(3:1,2:1)1:1)1:1,(5:1,(1:1,0:1)1:1)1:1)1:1)1:1,(13:1,12:1)1:1);')
+        self.host1 = Tree('((5,4)1,((1,0)1,2)1);')
+        self.guest1 = Tree('(((11,10)1,((7,(3,2)1)1,(5,(1,0)1)1)1)1,(13,12)1);')
         tempmap = {11: 0, 10: 4, 13: 1, 12: 1, 1: 1, 0: 4, 3: 4, 2: 2, 5: 4, 7: 4}
         self.map1 = {}
         for key in tempmap:
@@ -15,7 +14,7 @@ class TestTreeSearch(unittest.TestCase):
 
         self.host2 = Tree('(A,B)C;', format=1)
         self.guest2 = Tree('(((1,2)7,(3,4)8)10,(5,6)9)11;', format=1)
-        tempmap = {'1':"A",'2':"C",'3':"A",'4':"C",'5':"B",'6':"B"}
+        tempmap = {'1':"A",'2':"B",'3':"A",'4':"B",'5':"A",'6':"A"}
         self.map2 = {}
         for key in tempmap:
             self.map2[self.guest2&str(key)] = self.host2&(str(tempmap[key]))
@@ -29,8 +28,8 @@ class TestTreeSearch(unittest.TestCase):
         for key in mapping:
             namemap[key.name] = mapping[key].name
 
-        self.assertEqual(cost, 13)
-        self.assertEqual(namemap, {'1':"A",'2':"C",'3':"A",'4':"C",'5':"B",'6':"B",'7':"C",'8':"C",'9':"B",'10':"C",'11':"C"})
+        self.assertEqual(cost, 7)
+        self.assertEqual(namemap, {'1':"A",'2':"B",'3':"A",'4':"B",'5':"A",'6':"A",'7':"C",'8':"C",'9':"A",'10':"C",'11':"C"})
 
     def testReconcile(self):
         cost, mapping = reconcile(self.host2, self.guest2, self.map2)
@@ -38,11 +37,63 @@ class TestTreeSearch(unittest.TestCase):
         for key in mapping:
             namemap[key.name] = mapping[key].name
 
-        self.assertEqual(cost, 11)
-        self.assertEqual(namemap, {'1':"A",'2':"C",'3':"A",'4':"C",'5':"B",'6':"B",'7':"C",'8':"C",'9':"C",'10':"C",'11':"C"})
+        self.assertEqual(cost, 6.5)
+        self.assertEqual(namemap, {'1':"A",'2':"B",'3':"A",'4':"B",'5':"A",'6':"A",'7':"C",'8':"C",'9':"C",'10':"C",'11':"C"})
+
+    def testSPR(self):
+        """
+        Three cases:
+            1) Child of internal node to child of internal node
+            2) Child of root to child of internal node
+            3) Child of internal node to child of root
+
+        Exceptions (ValueError):
+            1) Root to any
+            2) Node to self
+            3) Node to parent
+            4) Node to sibling
+            5) Node to any node in its subtree
+        """
+
+        from TreeSearch import spr
+
+        t1 = Tree('(((A,B)F,C)H,(D,E)G)R;', format=1)
+        t2 = Tree('((A,(D,E)G)R,(B,C)F)H;', format=1)
+        t3 = Tree('(((A,C)H,(D,E)G)R,B)F;', format=1)
+
+        t = Tree('((A,(B,C)F)H,(D,E)G)R;', format=1)
+        t = spr(t, t&"B", t&"A")
+        assert(t1.robinson_foulds(t)[0] == 0)
+
+        t = Tree('((A,(B,C)F)H,(D,E)G)R;', format=1)
+        t = spr(t, t&"G", t&"A")
+        assert(t2.robinson_foulds(t)[0] == 0)
+
+        t = Tree('((A,(B,C)F)H,(D,E)G)R;', format=1)
+        t = spr(t, t&"B", t&"R")
+        assert(t3.robinson_foulds(t)[0] == 0)
+
+        t = Tree('((A,(B,C)F)H,(D,E)G)R;', format=1)
+        self.assertRaises(ValueError, spr, t, t&"R", t&"F")
+        self.assertRaises(ValueError, spr, t, t&"F", t&"F")
+        self.assertRaises(ValueError, spr, t, t&"A", t&"F")
+        self.assertRaises(ValueError, spr, t, t&"H", t&"B")
 
 if __name__ == '__main__':
     unittest.main()
+
+    """
+    host1 = Tree('((5,4)1,((1,0)1,2)1);')
+    guest1 = Tree('(((11,10)1,((7,(3,2)1)1,(5,(1,0)1)1)1)1,(13,12)1);')
+    tempmap = {11: 0, 10: 4, 13: 1, 12: 1, 1: 1, 0: 4, 3: 4, 2: 2, 5: 4, 7: 4}
+    map1 = {}
+    for key in tempmap:
+        map1[guest1&str(key)] = host1&(str(tempmap[key]))
+    cost, map1 = reconcileDL(host1, guest1, map1)
+    print cost
+    from TreeUtils import writeReconciliation
+    writeReconciliation(host1, guest1, map1)
+    """
 """
 import HostTreeGen, GuestTreeGen
 from Utils import printProgressBar
