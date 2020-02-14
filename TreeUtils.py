@@ -360,37 +360,47 @@ def raxml_score(benchTree, testTrees, seqfile):
 
     return scores, worse
 
-#TODO: Test this function
-def run_treefix(host, guest, lmap, sequences=False):
-    os.system('mkdir -p treefix/config; mkdir treefix/data')
+#TODO: only tested with Tree and dictionary inputs, not file inputs
+def run_treefix(host, guest, lmap, sequences):
+    os.system('mkdir -p tfix/config/; mkdir -p tfix/data/0/')
 
     if type(host) == str:
         os.system('cp ' + host + ' tfix/config/host.stree')
     else:
         writeTree(host, 'tfix/config/host.stree')
 
-    #guest is a path to a fastq file
-    if sequences:
-        raxml(guest, 'nwk')
-        os.system('cp RAxML_bestTree.nwk tfix/data/0/0.nt.raxml.tree')
     #guest is a path to a tree file
-    elif type(guest) == str:
+    if type(guest) == str:
         os.system('cp ' + guest + ' tfix/data/0/0.nt.raxml.tree')
-    
     #guest is a tree object
     else:
-        writeTree(host, 'tfix/data/0/0.nt.raxml.tree')
+        writeTree(guest, 'tfix/data/0/0.nt.raxml.tree')
+
+    #lmap is a file
+    if type(lmap) == str:
+        os.system('cp ' + lmap + 'tfix/config/guest.smap')
+    #lmap is a dictionary of guest -> host nodes
+    else:
+        f = open('tfix/config/guest.smap', 'w')
+        for key in lmap:
+            f.write(key.name + '\t' + lmap[key].name + '\n')
+        f.close()
+
+    #sequences is always a path to a fasta file
+    os.system('cp ' + sequences + ' tfix/data/0/0.nt.align')
 
     #Run TreeFix
-    cmd = 'treefix -s tfix/config/genes.stree \
-                -S tfix/config/genes.smap \
-                -A nt.align \
-                -o nt.raxml.tree \
-                -n nt.raxml.treefix.tree \
-                -V 0 \
-                -l data/0/0.nt.raxml.treefix.log \
-                data/0/0.nt.raxml.tree'
+    cmd = 'treefix -s tfix/config/host.stree'
+    cmd += ' -S tfix/config/guest.smap' 
+    cmd += ' -A nt.align '
+    cmd += ' -o nt.raxml.tree' 
+    cmd += ' -n nt.raxml.treefix.tree'
+    cmd += ' -V 0'
+    cmd += ' -l data/0/0.nt.raxml.treefix.log'
+    cmd += ' -e " -m PROTGAMMAJTT"'
+    cmd += ' tfix/data/0/0.nt.raxml.tree'
 
+    print cmd
     os.system(cmd)
 
     out = Tree('tfix/data/0/0.nt.raxml.treefix.tree')
