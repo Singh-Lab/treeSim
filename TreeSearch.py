@@ -272,7 +272,11 @@ def reconcileDL(host, guest, leafmap):
         guestParent = job.up
         if job.up == None:
             continue
-        a, b = guestParent.children
+        try:
+            a, b = guestParent.children
+        except:
+            print guest.get_ascii()
+            raise Exception
         if a in seen and b in seen:
             jobs.append(guestParent)
 
@@ -495,6 +499,21 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100, len_search_pat
         logging.info(logstring)
 
     return bestTree
+
+def genMap(host, guest):
+    #{guest -> host}
+    nodemap = {}
+    for leaf in guest:
+        hname = 'h' + leaf.name.split("_")[0][1:]
+        nodemap[leaf] = host&hname
+    return nodemap
+
+def name(t):
+    i=0
+    for node in t.traverse():
+        if 'g' not in node.name:
+            node.name = str(i)
+            i += 1
         
 if __name__ == '__main__':
     from test import withHost
@@ -511,13 +530,27 @@ if __name__ == '__main__':
     if host.name == '':
         host.name = 'h0'
     realGuest = Tree('guest.nwk', format=1)
-    
+    """
     #Run RAxML
     if "RAxML_bestTree.nwk" in os.listdir('.'):
         os.system('rm RAxML*')
     raxml('sequences.fa', 'nwk')
+    """
 
     guest = Tree('RAxML_bestTree.nwk')
+    name(guest)
+    guest = reroot(host, guest, genMap(host, guest))
+    name(guest)
+
+    writeTree(guest, 'raxmltree.nwk')
+
+    #Write out raxml mapping
+    cost, rec = reconcileDL(host, guest, genMap(host, guest))
+    f = open('raxml.map','w')
+    for key in rec:
+        out = key.name + '\t' + rec[key].name + '\n'
+        f.write(out)
+    f.close()
 
     result = raxml_score_from_file('RAxml_bestTree.nwk', 'guest.nwk', 'sequences.fa')
     score = result[1][0]
@@ -556,14 +589,6 @@ if __name__ == '__main__':
             i += 1
     
     writeTree(bestTree, 'searchtree.nwk')
-
-    def genMap(host, guest):
-        #{guest -> host}
-        nodemap = {}
-        for leaf in guest:
-            hname = 'h' + leaf.name.split("_")[0][1:]
-            nodemap[leaf] = host&hname
-        return nodemap
 
     cost, rec = reconcileDL(host, bestTree, genMap(host, bestTree))
 
