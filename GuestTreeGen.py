@@ -194,6 +194,14 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
         guest (Tree):   The complete guest tree topology
         nodemap (dict): host -> guest mapping of nodes
     """
+    global dupnodes
+    global dupevents
+    global lossnodes
+
+    dupnodes = 0
+    dupevents = 0
+    lossnodes = 0
+
     guest = createTree(startSize)
     guest.name = "g" + host.name[1:] + "_0"
     guest.add_feature('pos', 0)
@@ -245,8 +253,7 @@ def buildGuestTree(host, dupRateFunc, dupfunc, eventDist, branchFunc, startSize)
                 gleaves[treepositions[i]].add_child(newTrees[i])
 
     #clean(host, guest) #Only add this back in when clean problems are solved
-    print cost()
-
+    #print "GuestTreeGen: The cost is " + str(cost())
     return guest, nodemap
 
 def cost():

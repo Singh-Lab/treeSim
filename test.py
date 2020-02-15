@@ -8,8 +8,8 @@ from GuestTreeGen import buildGuestTree, exp, expon
 from CreateSequences import evolveAlongTree, evolveSequence
 from stats import gaussNoise
 from rootSequence import genRandomSequence2 as grs
-from TreeUtils import writeFasta, findDomains, raxml, raxml_score, raxml_score_from_file
-from TreeUtils import writeMapping, genMap
+from TreeUtils import findDomains, raxml, raxml_score, raxml_score_from_file
+from TreeUtils import writeMapping, writeFasta, writeTree, genMap
 from random import randint
 import pickle
 import numpy as np
@@ -161,10 +161,14 @@ def withHost(numLeaves = 4, bl = .5, hostTree = None):
             leaf.dist += extralen
 
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .1, gaussNoise, sd)
+    guestTree = guestTree.children[0]
+    guestTree.up = None
     
     for leaf in guestTree:
         leaf.dist += extralen
 
+    writeTree(hostTree, 'host.nwk')
+    writeTree(guestTree, 'guest.nwk')
     hostTree.write(outfile='host.nwk', format=1)
     guestTree.children[0].write(outfile='guest.nwk', format=1)
 
@@ -189,6 +193,8 @@ def generateTestCases(n=500):
     hostCases = 0
     while hostCases < n / 10:
 
+        printProgressBar(hostCases, n/10)
+
         try:
             host = withHost(8, .3)[0]
         except:
@@ -205,7 +211,7 @@ def generateTestCases(n=500):
             writeMapping(genMap(host, guest), 'guest.map')
             folder_name = 'examples/' + str(hostCases*10 + guestCases) + '/'
             system('mkdir ' + folder_name)
-            system('mv host.nwk guest.nwk sequences.fa guest.map' + folder_name)
+            system('mv host.nwk guest.nwk sequences.fa guest.map ' + folder_name)
 
             guestCases += 1
 
