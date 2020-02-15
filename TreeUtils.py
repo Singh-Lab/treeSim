@@ -96,6 +96,21 @@ def readMapping(host, guest, mapfile=None):
     else:
         pass
 
+def genMap(host, guest, names=False):
+    """
+    Works only in the case that node gx_y maps to node hx
+    """
+    #{guest -> host}
+    nodemap = {}
+    for leaf in guest:
+        gname = leaf.name
+        hname = 'h' + gname.split("_")[0][1:]
+        if names:
+            nodemap[gname] = hname
+        else:
+            nodemap[leaf] = host&hname
+    return nodemap
+
 def writeMapping(nodemap, filename):
     """
     Writes out a mapping between host nodes and guest nodes. Each line of the output
@@ -105,8 +120,9 @@ def writeMapping(nodemap, filename):
     outputHandle = open(filename, 'w')
 
     for node in nodemap:
-        out = node.name + ' ' + ' '.join([i.name for i in nodemap[node]])
-        outputHandle.write(out + '\n')
+        out = node.name + '\t' + nodemap[node].name + '\n'
+        #out = node.name + ' ' + ' '.join([i.name for i in nodemap[node]]) + '\n'
+        outputHandle.write(out)
 
     outputHandle.close()
 

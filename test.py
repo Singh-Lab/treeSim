@@ -9,6 +9,7 @@ from CreateSequences import evolveAlongTree, evolveSequence
 from stats import gaussNoise
 from rootSequence import genRandomSequence2 as grs
 from TreeUtils import writeFasta, findDomains, raxml, raxml_score, raxml_score_from_file
+from TreeUtils import writeMapping, genMap
 from random import randint
 import pickle
 import numpy as np
@@ -150,11 +151,19 @@ def noHost(samples):
 
     f.close()
 
-def withHost(numLeaves = 4, bl = .5):
+def withHost(numLeaves = 4, bl = .5, hostTree = None):
     sd = 1 #startingDomains
+    extralen = .05
 
-    hostTree = createRandomTopology(numLeaves, bl, lambda x: x)
+    if hostTree is None:
+        hostTree = createRandomTopology(numLeaves, bl, lambda x: x)
+        for leaf in hostTree:
+            leaf.dist += extralen
+
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .1, gaussNoise, sd)
+    
+    for leaf in guestTree:
+        leaf.dist += extralen
 
     hostTree.write(outfile='host.nwk', format=1)
     guestTree.children[0].write(outfile='guest.nwk', format=1)
@@ -174,6 +183,33 @@ def withHost(numLeaves = 4, bl = .5):
     writeFasta(names, seqs, 'sequences.fa')
 
     return hostTree, guestTree, names, seqs
+
+def generateTestCases(n=500):
+
+    hostCases = 0
+    while hostCases < n / 10:
+
+        try:
+            host = withHost(8, .3)[0]
+        except:
+            continue
+
+        guestCases = 0
+        while guestCases < 10:
+
+            try:
+                guest = withHost(8, .3, host)[1]
+            except:
+                 continue
+
+            writeMapping(genMap(host, guest), 'guest.map')
+            folder_name = 'examples/' + str(hostCases*10 + guestCases) + '/'
+            system('mkdir ' + folder_name)
+            system('mv host.nwk guest.nwk sequences.fa guest.map' + folder_name)
+
+            guestCases += 1
+
+        hostCases += 1
 
 def parseIQOutput(filename):
     f = list(open(filename))
@@ -384,7 +420,7 @@ def treeSearchTest(n=100):
 
     #Generate host and guest tree
     print "Generating Trees"
-    host, guest, names, seqs = withHost(6, .3) #Experimentally determined from testLikelihood()
+    host, guest, names, seqs = withHost(8, .3) #Experimentally determined from testLikelihood()
     guest = guest.children[0]
     guest.up = None
     name(guest)
@@ -543,10 +579,11 @@ def seqDiff(n=10, bl=1):
 if __name__ == "__main__":
     print datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '\n'
     #host, guest, names, seqs = withHost()
-    treeSearchTest()
+    #treeSearchTest()
     #emMatTest()
     #for bl in [.1, .25, .5, .75, 1]:
         #seqGenTest(100, bl)
     #seqDiff(bl=.5)
     #testLikelihood()
+    generateTestCases(10)
     print '\n', datetime.now().strftime('%Y-%m-%d %H:%M:%S')
