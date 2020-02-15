@@ -180,8 +180,10 @@ def withHost(numLeaves = 4, bl = .5, hostTree = None):
     for node in hostTree.traverse():
         node.del_feature('leaves')
 
+    guestTree = guestTree.children[0]
+    guestTree.up = None
     writeTree(hostTree, 'host.nwk')
-    writeTree(guestTree.children[0], 'guest.nwk')
+    writeTree(guestTree, 'guest.nwk')
     writeFasta(names, seqs, 'sequences.fa')
 
     return hostTree, guestTree, names, seqs
@@ -582,12 +584,12 @@ def seqDiff(n=10, bl=1):
 
 if __name__ == "__main__":
     print datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '\n'
-    #host, guest, names, seqs = withHost()
+    host, guest, names, seqs = withHost()
     #treeSearchTest()
     #emMatTest()
     #for bl in [.1, .25, .5, .75, 1]:
         #seqGenTest(100, bl)
     #seqDiff(bl=.5)
     #testLikelihood()
-    generateTestCases(10)
+    #generateTestCases(10)
     print '\n', datetime.now().strftime('%Y-%m-%d %H:%M:%S')
