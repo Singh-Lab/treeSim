@@ -169,8 +169,6 @@ def withHost(numLeaves = 4, bl = .5, hostTree = None):
 
     writeTree(hostTree, 'host.nwk')
     writeTree(guestTree, 'guest.nwk')
-    hostTree.write(outfile='host.nwk', format=1)
-    guestTree.children[0].write(outfile='guest.nwk', format=1)
 
     rootSequence = grs(sd)
     evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs, transmat)
@@ -193,8 +191,6 @@ def generateTestCases(n=500):
     hostCases = 0
     while hostCases < n / 10:
 
-        printProgressBar(hostCases, n/10)
-
         try:
             host = withHost(8, .3)[0]
         except:
@@ -202,6 +198,8 @@ def generateTestCases(n=500):
 
         guestCases = 0
         while guestCases < 10:
+
+            printProgressBar(hostCases * 10 + guestCases, n)
 
             try:
                 guest = withHost(8, .3, host)[1]
@@ -584,12 +582,12 @@ def seqDiff(n=10, bl=1):
 
 if __name__ == "__main__":
     print datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '\n'
-    #host, guest, names, seqs = withHost()
+    host, guest, names, seqs = withHost()
     #treeSearchTest()
     #emMatTest()
     #for bl in [.1, .25, .5, .75, 1]:
         #seqGenTest(100, bl)
     #seqDiff(bl=.5)
     #testLikelihood()
-    generateTestCases(10)
+    #generateTestCases(10)
     print '\n', datetime.now().strftime('%Y-%m-%d %H:%M:%S')
