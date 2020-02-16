@@ -498,7 +498,19 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100, len_search_pat
             logstring += "Better tree not found"
         logging.info(logstring)
 
-    return bestTree
+    return bestScore, bestTree
+
+def best_of_n(sequences, host, guest, leafmap, num_iter=100, len_search_path=100, n=5):
+    bestTree = []
+    bestScore = float('inf')
+
+    for _ in range(n):
+        bt, bs = perform_search(sequences, host, guest, leafmap, num_iter, len_search_path)
+        if bs < bestScore:
+            bestScore = bs
+            bestTree = bt
+
+    return bestScore, bestTree
 
 def genMap(host, guest):
     #{guest -> host}
@@ -580,7 +592,7 @@ if __name__ == '__main__':
     logging.info('Actual Score: ' + str(realScore))
 
     logging.info('Initializing Tree Search Test')
-    bestTree = perform_search(sequences, host, guest, lmap, 100)
+    bestScore, bestTree = perform_search(sequences, host, guest, lmap, 100)
 
     i = 50
     for node in bestTree.traverse():
