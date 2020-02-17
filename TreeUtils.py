@@ -318,7 +318,7 @@ def raxml_score_from_file(benchfile, testfile, seqfile):
     #command = '/home/caluru/Downloads/standard-RAxML-master/raxmlHPC-PTHREADS-AVX2 '
     command = 'raxml '
     #Switch to -f h if this takes too long
-    command += '-f H -t' + benchfile + ' -z ' + testfile + ' -s ' + seqfile + ' -m PROTGAMMAJTT -T 8 -n sco'
+    command += '-f H -t ' + benchfile + ' -z ' + testfile + ' -s ' + seqfile + ' -m PROTGAMMAJTT -T 8 -n sco'
     command += ' > raxml_log.txt'
     #TODO: Read results and select tree
     os.system(command)

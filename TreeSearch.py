@@ -501,11 +501,13 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100, len_search_pat
     return bestScore, bestTree
 
 def best_of_n(sequences, host, guest, leafmap, num_iter=100, len_search_path=100, n=5):
-    bestTree = []
+    bestTree = None
     bestScore = float('inf')
 
     for _ in range(n):
-        bt, bs = perform_search(sequences, host, guest, leafmap, num_iter, len_search_path)
+        h = host.copy()
+        g = guest.copy()
+        bs, bt = perform_search(sequences, h, g, genMap(h, g), num_iter, len_search_path)
         if bs < bestScore:
             bestScore = bs
             bestTree = bt
@@ -542,12 +544,11 @@ if __name__ == '__main__':
     if host.name == '':
         host.name = 'h0'
     realGuest = Tree('guest.nwk', format=1)
-    """
+    
     #Run RAxML
     if "RAxML_bestTree.nwk" in os.listdir('.'):
         os.system('rm RAxML*')
     raxml('sequences.fa', 'nwk')
-    """
 
     guest = Tree('RAxML_bestTree.nwk')
     name(guest)
@@ -564,7 +565,7 @@ if __name__ == '__main__':
         f.write(out)
     f.close()
 
-    result = raxml_score_from_file('RAxml_bestTree.nwk', 'guest.nwk', 'sequences.fa')
+    result = raxml_score_from_file('RAxML_bestTree.nwk', 'guest.nwk', 'sequences.fa')
     score = result[1][0]
 
     if score == 0:

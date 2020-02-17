@@ -584,7 +584,7 @@ def seqDiff(n=10, bl=1):
 
 if __name__ == "__main__":
     print datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '\n'
-    host, guest, names, seqs = withHost()
+    host, guest, names, seqs = withHost(8, .3)
     #treeSearchTest()
     #emMatTest()
     #for bl in [.1, .25, .5, .75, 1]:
