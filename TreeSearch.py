@@ -487,9 +487,10 @@ def perform_search(sequences, host, guest, leafmap, num_iter=100, len_search_pat
                 costs.pop(i)
 
         #pick the best tree for the next iteration
-        index = np.argmin(costs)
-        bestScore = costs[index]
-        bestTree = pool[index]
+        if len(costs) != 0:
+            index = np.argmin(costs)
+            bestScore = costs[index]
+            bestTree = pool[index]
 
         logstring = 'Iteration Number ' + str(iteration)  + ": "
         if index != 0:
