@@ -168,7 +168,7 @@ def s3(x):
 
 #Utilities for finding domains
 
-def findDomainsFile(infile, hmmfile):
+def findDomainsFile(infile, hmmfile, version=2):
     """
     Finds all domains in infile according to hmm in hmmfile using hmmsearch232.
     Assumes only one sequence is in the infile
@@ -184,8 +184,12 @@ def findDomainsFile(infile, hmmfile):
     """
     #domName = os.popen("grep 'NAME' " + hmmfile).read().split()[1]
     seqName = list(open(infile))[0][1:].strip()
-    os.system("hmmsearch232 --domE 0.00001 " + hmmfile + " " + infile 
-                + " | grep '^ [ ]*" + seqName + "' > tmp/grepoutput.txt")
+    if version == 2:
+        os.system("hmmsearch232 --domE 0.00001 " + hmmfile + " " + infile 
+                    + " | grep '^ [ ]*" + seqName + "' > tmp/grepoutput.txt")
+    else:
+        os.system("hmmsearch --domE 0.00001 " + hmmfile + " " + infile 
+                    + " | grep '^ [ ]*" + seqName + "' > tmp/grepoutput.txt")
     hits = list(open('tmp/grepoutput.txt'))
     starts, ends, seqs = [], [], []
 
@@ -204,8 +208,36 @@ def findDomainsFile(infile, hmmfile):
         
     return starts, ends, seqs
 
-#Finds all domains in the input sequence according to hmm in hmmfile using hmmsearch232	
-def findDomains(sequence, hmmfile):
+def findMotifsFile(infile, mfile):
+    """
+    Finds all motif matches in infile according to motif in mfile using mast.
+    Assumes only one sequence is in the infile
+
+    Args:
+    infile  (str): The path to the fasta file to search for domains in
+    mfile (str): Path to file containing motif to search for
+
+    Output:
+    starts (list): List of starting positions of motifs found
+    ends   (list): List of ending positions of motifs found
+    seqs   (list): List of motif sequences found 
+    """
+    starts, ends, seqs = [], [], []
+    sequence = list(open(infile))[1].strip()
+
+    os.system("mast -hit_list " + mfile + " " + infile + " > tmp/mast_output.txt")
+    f = list(open('tmp/mast_output.txt'))
+
+    for line in f:
+        if line[0] != "#":
+            temp = line.split()
+            starts.append(int(temp[4]))
+            ends.append(int(temp[5]))
+            seqs.append(sequence[int(temp[4]) : int(temp[5]) + 1])
+
+    return starts, ends, seqs
+
+def findDomains(sequence, hmmfile, version=2):
     """
     Finds domains in the given sequence
 
@@ -222,7 +254,26 @@ def findDomains(sequence, hmmfile):
     g.write('>seq\n' + sequence)
     g.close()
     
-    return findDomainsFile('tmp/tmp.fa', hmmfile)
+    return findDomainsFile('tmp/tmp.fa', hmmfile, version)
+
+def findMotifs(sequence, mfile):
+    """
+    Finds motifs in the given sequence
+
+    Args:
+    sequence (str): sequence to search for motifs in
+    hmmfile (str): Path to file containing hmm to search for
+
+    Output:
+    starts (list): List of starting positions of motifs found
+    ends   (list): List of ending positions of motifs found
+    seqs   (list): List of motif sequences found 
+    """
+    g = open('tmp/tmp.fa','w')
+    g.write('>seq\n' + sequence)
+    g.close()
+    
+    return findMotifsFile('tmp/tmp.fa', mfile)
 
 def printDomSeq(sequence, hmmfile, minimal_rep = False):
     """
