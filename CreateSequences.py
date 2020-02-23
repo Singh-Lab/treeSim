@@ -3,12 +3,14 @@
 
 from ete3 import Tree
 import numpy as np
-from TreeUtils import findDomains, isValid, printDomSeq
+from TreeUtils import findDomains, findMotifs, isValid, printDomSeq
 from stats import exp, drawFromDiscrete
 from math import log
 from pyvolve import Model, Partition, Evolver, read_tree
 from OrthoAnalysis import selfSimilarity
 from scipy.linalg import expm
+
+HMMER = False #Users hmmer if true, mast if false (Must change config file accordingly)
 
 #####################################
 #                                   #
@@ -31,7 +33,10 @@ def duplicate(sequence, hmmfile, domNumber, length):
         sequence (str ): The sequence after the specified duplication.	
     """
     BASELINKER = 'TGEVK'
-    starts, ends = findDomains(sequence, hmmfile)[:2]
+    if HMMER:
+        starts, ends = findDomains(sequence, hmmfile)[:2]
+    else:
+        starts, ends = findMotifs(sequence, hmmfile)[:2]
 
     sequence = sequence[:ends[domNumber + length - 1] + 1] + BASELINKER + \
                     sequence[starts[domNumber]:]
@@ -48,7 +53,10 @@ def remove(sequence, hmmfile, domNumber):
         domNumber: The position of the domain to be duplicated w.r.t. the other domains
     Returns sequence with specified duplication
     """
-    starts, ends = findDomains(sequence, hmmfile)[:2]
+    if HMMER:
+        starts, ends = findDomains(sequence, hmmfile)[:2]
+    else:
+        starts, ends = findMotifs(sequence, hmmfile)[:2]
 
     #Removes one of the linkers if necessary
     if domNumber > 0:
@@ -190,7 +198,10 @@ def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile, transma
     """
 
     #Find domains, check if sequence begins and/or ends with a domain
-    domains = findDomains(sequence, hmmfile)[2]
+    if HMMER:
+        domains = findDomains(sequence, hmmfile)[2]
+    else:
+        domains = findMotifs(sequence, hmmfile)[2]
 
     #split on all domains
     for seq in domains:
@@ -226,8 +237,6 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename, transma
     Args:
         
     """
-    #starts, ends, seqs = findDomains(sequence, hmmfile)
-
     jobs = []
     workingSet = set()
 
@@ -240,7 +249,6 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename, transma
 
     #process these roots one at a time
     while len(jobs) != 0:
-        #starts, ends, seqs = findDomains(sequence, hmmfile)
         jobs.sort() #sorts jobs by distance from the root
         dist, node = jobs.pop(0)
         workingSet.remove(node)
@@ -248,16 +256,12 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename, transma
             #print 'evolving for:', dist, '\n'
             sequence = evolveSequence(sequence, rate, dist, emissionProbs, hmmfile, transmat)
 
-        #node.domain = seqs[node.position]
-
         for job in jobs:
             job[0] -= dist
 
         #Only need to deal with duplication and loss events explicitly;
         #speciation and leaf nodes require no work
         if node.event == 'DUPLICATION':
-
-            #print (node.name, node.dupNumber), #[(thing[1].name, thing[1].dupNumber) for thing in jobs]
 
             #Find all other nodes marked in the same tandem duplication
             td = [(node.position, node)]
@@ -287,22 +291,11 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename, transma
                 jobs.append([a.dist, a])
                 jobs.append([b.dist, b])
 
-            #print 'DUPLICATION, size ' + str(size) + 'at ' + str(td[0][1].position) + \
-            #        ' ,now ' + str(len(starts) + size) + ' domains'
-            #printDomSeq(sequence, hmmfile)
-            #print tree.get_ascii(attributes=['position'])
-
         if node.event == 'LOSS':
             sequence = remove(sequence, hmmfile, node.position)
             for otherNode in workingSet:
                 if otherNode.position >= node.position: #Why does this have to be >= instead of > ?
                     otherNode.position -= 1
-                    
-            #print 'LOSS at ' + str(node.position) + ' ,now ' + str(len(starts) - 1) + ' domains'
-            #printDomSeq(sequence, hmmfile)
-            #print tree.get_ascii(attributes=['position'])
-
-        #selfSimilarity(hnodename, sequence, hmmfile, True)
 
     return sequence
 
@@ -378,7 +371,6 @@ if __name__ == '__main__':
     import pickle
     from ConfigParser import ConfigParser as CP
 
-    #eppath = '/home/caluru/Documents/shilpa/treeSimulation/simulation/zf_shilpa_probabilities.pickle'
     eppath = CP.EP_PATH #pylint: disable=no-member
     emissionProbs = pickle.load(open(eppath))
     hmmfile = CP.HMM_PATH #pylint: disable=no-member

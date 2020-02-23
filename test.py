@@ -8,7 +8,7 @@ from GuestTreeGen import buildGuestTree, exp, expon
 from CreateSequences import evolveAlongTree, evolveSequence
 from stats import gaussNoise
 from rootSequence import genRandomSequence2 as grs
-from TreeUtils import findDomains, raxml, raxml_score, raxml_score_from_file
+from TreeUtils import findDomains, findMotifs, raxml, raxml_score, raxml_score_from_file
 from TreeUtils import writeMapping, writeFasta, writeTree, genMap
 from random import randint
 import pickle
@@ -22,6 +22,8 @@ eppath = CP.EP_PATH #pylint: disable=no-member
 transmat = pickle.load(open(CP.TRANSMAT)) #pylint: disable=no-member
 emissionProbs = pickle.load(open(eppath))
 hmmfile = CP.HMM_PATH #pylint: disable=no-member
+
+HMMER = False
 
 def s2(x):
     denom = 1 + exp(10-x) if x < 10 else 1
@@ -59,7 +61,10 @@ def generateIQTree():
     names, seqs = [], []
 
     for node in hostTree:
-        seqs += findDomains(node.sequence, hmmfile)[2]
+        if HMMER:
+            seqs += findDomains(node.sequence, hmmfile)[2]
+        else:
+            seqs += findMotifs(node.sequence, hmmfile)[2]
         gnodes = findLeaves(nodeMap[node])
         n = [(leaf.position, leaf.name) for leaf in gnodes if leaf.event != 'LOSS']
         n.sort()
@@ -71,7 +76,10 @@ def generateIQTree():
     guestTree.children.append(outgroup)
     outgroup.name = 'Outgroup'
     outseq = evolveSequence(rootSequence, .1, 2, emissionProbs, hmmfile, transmat)
-    outseq = findDomains(outseq, hmmfile)[2][0]
+    if HMMER:
+        outseq = findDomains(outseq, hmmfile)[2][0]
+    else:
+        outseq = findMotifs(outseq, hmmfile)[2][0]
     outgroup.add_feature('sequence', outseq)
     seqs.insert(0, outseq)
     names.insert(0, 'Outgroup')
@@ -175,7 +183,10 @@ def withHost(numLeaves = 4, bl = .5, hostTree = None):
     seqs = []
     hnodes = sorted([i.name for i in hostTree]) 
     for node in hnodes:
-        seqs += findDomains((hostTree&node).sequence, hmmfile)[2]
+        if HMMER:
+            seqs += findDomains((hostTree&node).sequence, hmmfile)[2]
+        else:
+            seqs += findMotifs((hostTree&node).sequence, hmmfile)[2]
 
     for node in hostTree.traverse():
         node.del_feature('leaves')
@@ -556,14 +567,20 @@ def seqDiff(n=10, bl=1):
     NORMAL = '\033[0m'
 
     seq = grs(1)
-    dom = findDomains(seq, hmmfile)[2][0]
+    if HMMER:
+        dom = findDomains(seq, hmmfile)[2][0]
+    else:
+        dom = findMotifs(seq, hmmfile)[2][0]
     print dom
 
     iterations = 0
     while iterations < n:
         try:
             temp = evolveSequence(seq, .05, bl, emissionProbs, hmmfile, transmat)
-            tempdom = findDomains(temp, hmmfile)[2][0]
+            if HMMER:
+                tempdom = findDomains(temp, hmmfile)[2][0]
+            else:
+                tempdom = findMotifs(temp, hmmfile)[2][0]
             out = ""
             nMuts = 0
             for i in range(len(dom)):

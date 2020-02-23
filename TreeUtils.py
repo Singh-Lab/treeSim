@@ -231,9 +231,9 @@ def findMotifsFile(infile, mfile):
     for line in f:
         if line[0] != "#":
             temp = line.split()
-            starts.append(int(temp[4]))
-            ends.append(int(temp[5]))
-            seqs.append(sequence[int(temp[4]) : int(temp[5]) + 1])
+            starts.append(int(temp[4]) - 1) #MAST is 1-indexed :(
+            ends.append(int(temp[5]) - 1)
+            seqs.append(sequence[int(temp[4]) : int(temp[5])])
 
     return starts, ends, seqs
 
