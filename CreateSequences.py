@@ -10,7 +10,7 @@ from pyvolve import Model, Partition, Evolver, read_tree
 from OrthoAnalysis import selfSimilarity
 from scipy.linalg import expm
 
-HMMER = False #Users hmmer if true, mast if false (Must change config file accordingly)
+HMMER = True #Uses hmmer if true, mast if false (Must change config file accordingly)
 
 #####################################
 #                                   #
@@ -33,6 +33,7 @@ def duplicate(sequence, hmmfile, domNumber, length):
         sequence (str ): The sequence after the specified duplication.	
     """
     BASELINKER = 'TGEVK'
+    #BASELINKER = ''
     if HMMER:
         starts, ends = findDomains(sequence, hmmfile)[:2]
     else:
@@ -125,10 +126,10 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs, transmat, hmmfile)
     #Returns the number of mutations that occur on a branch with time t
     def numMutations(t):
         count = 0
-        t -= exp(rate)
+        t -= exp((1./rate) * 1./len(sequence))
         while t > 0:
             count += 1
-            t -= exp(rate)
+            t -= exp(rate * 1./len(sequence))
         return count
 
     #Entropy of a probability distribution
@@ -136,7 +137,7 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs, transmat, hmmfile)
         return [-1 * p * log(p, 2) for p in line]
 
     entropies = [sum(entropy(i)) for i in emissionProbs]
-    entropies = entropies / sum(entropies)
+    entropies = [i / sum(entropies) for i in entropies]
 
     #TODO: change so we only generate matrices for the required positions?
     transitions = genTransitionMatrix(emissionProbs, transmat, branchLength)
@@ -156,6 +157,7 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs, transmat, hmmfile)
             
             seqCopy = seqCopy[:position] + alphabet[character] + seqCopy[position+1:]
         invalid = not isValid(seqCopy, hmmfile)
+        #invalid = False
         invalidCounter += 1
         if invalidCounter >= 25:
             raise ValueError
@@ -353,7 +355,7 @@ def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProb
             t = guest
 
         #Actually do the work
-        tempSequence = domainOrder(tempSequence, 0.1, hmmfile, emissionProbs, t, hostNode.name, transmat)
+        tempSequence = domainOrder(tempSequence, .75, hmmfile, emissionProbs, t, hostNode.name, transmat)
         hostNode.sequence = tempSequence
 
         #Reconnect all root and leaf nodes to the rest of the guest tree

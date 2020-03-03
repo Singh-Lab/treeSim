@@ -5,6 +5,8 @@ from Utils import sortBy
 import numpy as np
 import os
 
+HMMER = True
+
 #Tree I/O 
 def readTree(filename):
     """
@@ -225,7 +227,7 @@ def findMotifsFile(infile, mfile):
     starts, ends, seqs = [], [], []
     sequence = list(open(infile))[1].strip()
 
-    os.system("mast -hit_list " + mfile + " " + infile + " > tmp/mast_output.txt")
+    os.system("mast -hit_list " + mfile + " " + infile + " > tmp/mast_output.txt 2> crap.txt")
     f = list(open('tmp/mast_output.txt'))
 
     for line in f:
@@ -233,7 +235,7 @@ def findMotifsFile(infile, mfile):
             temp = line.split()
             starts.append(int(temp[4]) - 1) #MAST is 1-indexed :(
             ends.append(int(temp[5]) - 1)
-            seqs.append(sequence[int(temp[4]) : int(temp[5])])
+            seqs.append(sequence[int(temp[4]) - 1 : int(temp[5])])
 
     return starts, ends, seqs
 
@@ -293,7 +295,10 @@ def printDomSeq(sequence, hmmfile, minimal_rep = False):
     NORMAL = '\033[0m'
 
     #Find domains, check if sequence begins and/or ends with a domain
-    domains = findDomains(sequence, hmmfile)[2]
+    if HMMER:
+        domains = findDomains(sequence, hmmfile)[2]
+    else:
+        domains = findMotifs(sequence, hmmfile)[2]
 
     #split on all domains
     for domain in domains:
@@ -320,13 +325,17 @@ def printDomSeq(sequence, hmmfile, minimal_rep = False):
 def isValid(domain, hmmfile):
     """Checks if the input string is a valid zf-C2H2 domain"""
 
-    #Can HMMER find it?
-    seqs = findDomains(domain, hmmfile)[2]
+    #Can HMMER/MAST find it?
+    if HMMER:
+        seqs = findDomains(domain, hmmfile)[2]
+        #Assumes that we are using zf if we are using an hmm instead of a motif
+        valid = len(domain) == 23 and domain[2] == "C" and domain[5] == "C"
+        valid &= domain[18] == "H" and domain[22] == "H"
+    else:
+        seqs = findMotifs(domain, hmmfile)[2]
+        valid = True
     if len(seqs) > 0 and domain != seqs[0]:
         return False
-
-    valid = len(domain) == 23 and domain[2] == "C" and domain[5] == "C"
-    valid &= domain[18] == "H" and domain[22] == "H"
 
     return valid
 
@@ -342,7 +351,7 @@ def raxml(infile, outext):
 
     #Remove previous run if it exists (RAxML will not clobber existing results)
     if "RAxML_bestTree.nwk" in os.listdir('.'):
-        os.system('rm RAxML_bestTree.nwk')
+        os.system('rm RAxML_*')
 
     command = 'raxml -s '
     command += infile + ' -n ' + outext + ' -m PROTGAMMAJTT -T 8 -p ' + str(np.random.randint(2000) + 1)
@@ -467,7 +476,6 @@ def run_treefix(host, guest, lmap, sequences):
     cmd += ' -e " -m PROTGAMMAJTT"'
     cmd += ' tfix/data/0/0.nt.raxml.tree'
 
-    print cmd
     os.system(cmd)
 
     out = Tree('tfix/data/0/0.nt.raxml.treefix.tree')
