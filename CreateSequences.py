@@ -9,8 +9,9 @@ from math import log
 from pyvolve import Model, Partition, Evolver, read_tree
 from OrthoAnalysis import selfSimilarity
 from scipy.linalg import expm
+from ConfigParser import ConfigParser as CP
 
-HMMER = True #Uses hmmer if true, mast if false (Must change config file accordingly)
+HMMER = eval(CP.USE_HMMER) #Uses hmmer if true, mast if false (Must change config file accordingly)
 
 #####################################
 #                                   #
@@ -98,7 +99,10 @@ def genTransitionMatrix(emissionProbs, transmat, branchLength):
     for i in range(len(transmat)):
         transmat[i][i] = 0
     transmat = [i / sum(i) for i in transmat]
+
+    return [transmat] * 80
     
+    """
     out = []
     for position in emissionProbs:
         temp = [np.multiply(position, i) for i in transmat]
@@ -106,6 +110,7 @@ def genTransitionMatrix(emissionProbs, transmat, branchLength):
         out.append(temp)
 
     return out
+    """
 
 def evolveDomain(sequence, rate, branchLength, emissionProbs, transmat, hmmfile):
     """
@@ -198,6 +203,9 @@ def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile, transma
                          aa appearing at that position (in pfam hmm order) 
         transmat (list): aa transition matrix with dimensions (20 x 20)
     """
+    #FOR TESTING
+    original_sequence = sequence
+    #END TESTING BLOCK
 
     #Find domains, check if sequence begins and/or ends with a domain
     if HMMER:
@@ -222,8 +230,15 @@ def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile, transma
 
     #Reassemble full sequence post evolution
     sequence = ''
-    for i in range(len(domains)):
-        sequence += sequences[i] + domains[i]
+    try:
+        for i in range(len(domains)):
+            sequence += sequences[i] + domains[i]
+    except:
+        print original_sequence
+        print domains
+        print sequences
+        printDomSeq(original_sequence, hmmfile)
+        raise Exception
 
     sequence += sequences[-1] if len(sequences) > len(domains) else domains[-1]
 

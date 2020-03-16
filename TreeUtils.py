@@ -4,8 +4,11 @@ from math import exp
 from Utils import sortBy
 import numpy as np
 import os
+from ConfigParser import ConfigParser as CP
 
-HMMER = True
+HMMER = eval(CP.USE_HMMER)
+alphabet = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 
+                'T', 'V', 'W', 'Y']
 
 #Tree I/O 
 def readTree(filename):
@@ -22,13 +25,13 @@ def writeReconciliation(host, guest, mapping):
     """
     os.system('mkdir output')
 
-    i=20
+    i=0
     for node in host.traverse():
         if node.name == '':
             node.name = str(i)
             i += 1
 
-    i=20
+    i=0
     for node in guest.traverse():
         if node.name == '':
             node.name = str(i)
@@ -227,7 +230,8 @@ def findMotifsFile(infile, mfile):
     starts, ends, seqs = [], [], []
     sequence = list(open(infile))[1].strip()
 
-    os.system("mast -hit_list " + mfile + " " + infile + " > tmp/mast_output.txt 2> crap.txt")
+    """
+    os.system("mast -hit_list -mt .001 " + mfile + " " + infile + " > tmp/mast_output.txt 2> crap.txt")
     f = list(open('tmp/mast_output.txt'))
 
     for line in f:
@@ -236,6 +240,20 @@ def findMotifsFile(infile, mfile):
             starts.append(int(temp[4]) - 1) #MAST is 1-indexed :(
             ends.append(int(temp[5]) - 1)
             seqs.append(sequence[int(temp[4]) - 1 : int(temp[5])])
+            
+    """
+    
+    #Switch from MAST to FIMO
+    os.system("fimo --text --thresh .001 " + mfile + " " + infile + " > tmp/mast_output.txt 2> crap.txt")
+    f = list(open('tmp/mast_output.txt'))
+    
+    for line in f:
+        if 'motif_id' not in line and line.strip() != '':
+            temp = line.split('\t')
+            starts.append(int(temp[3]) - 1) #MAST is 1-indexed :(
+            ends.append(int(temp[4]) - 1)
+            seqs.append(sequence[int(temp[3]) - 1 : int(temp[4])])
+
 
     return starts, ends, seqs
 
@@ -481,3 +499,12 @@ def run_treefix(host, guest, lmap, sequences):
     out = Tree('tfix/data/0/0.nt.raxml.treefix.tree')
     os.system('rm -r tfix')
     return out
+
+def generateFakeSequence(domfile, l=100):
+    """
+    Generates a fake sequence with flanking regions of length l generated completely at random 
+    """
+    start = ''.join([np.random.choice(alphabet) for _ in range(l)])
+    end = ''.join([np.random.choice(alphabet) for _ in range(l)])
+    doms = list(open(domfile))[1::2]
+    return start + np.random.choice(doms)[:-1] + end

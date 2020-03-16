@@ -10,6 +10,7 @@ from stats import gaussNoise
 from rootSequence import genRandomSequence2 as grs
 from TreeUtils import findDomains, findMotifs, raxml, raxml_score, raxml_score_from_file
 from TreeUtils import writeMapping, writeFasta, writeTree, genMap
+from TreeUtils import generateFakeSequence as gfs
 from random import randint
 import pickle
 import numpy as np
@@ -23,7 +24,15 @@ transmat = pickle.load(open(CP.TRANSMAT)) #pylint: disable=no-member
 emissionProbs = pickle.load(open(eppath))
 hmmfile = CP.HMM_PATH #pylint: disable=no-member
 
-HMMER = False
+HMMER = eval(CP.USE_HMMER)
+
+def name(tree):
+    i = 100
+    for node in tree.traverse():
+        if node.name == '':
+            node.name = str(i)
+            i += 1
+
 
 def s2(x):
     denom = 1 + exp(10-x) if x < 10 else 1
@@ -168,12 +177,16 @@ def withHost(numLeaves = 4, bl = .5, hostTree = None):
         for leaf in hostTree:
             leaf.dist += extralen
 
-    guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .1, gaussNoise, sd)
+    dupFunc = lambda x, y: 1
+    #guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .1, gaussNoise, sd)
+    guestTree, nodeMap = buildGuestTree(hostTree, s2, dupFunc, .1, gaussNoise, sd)
     
     for leaf in guestTree:
         leaf.dist += extralen
 
-    rootSequence = grs(sd)
+    #rootSequence = grs(sd)
+    rootSequence = gfs('60_emissions.fa', 40)
+
     evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs, transmat)
     names = [(leaf.position, leaf.name) for leaf in guestTree if leaf.event != 'LOSS']
     names.sort()
@@ -220,9 +233,19 @@ def generateTestCases(n=500):
                  continue
 
             writeMapping(genMap(host, guest), 'guest.map')
-            folder_name = 'examples/' + str(hostCases*10 + guestCases) + '/'
+            folder_name = '60_examples/' + str(hostCases*10 + guestCases) + '/'
             system('mkdir ' + folder_name)
             system('mv host.nwk guest.nwk sequences.fa guest.map ' + folder_name)
+            system('mv ' + folder_name + 'guest.nwk ' + folder_name + 'guest_full.nwk')
+            guest.write(format=1, outfile=folder_name + 'guest.nwk')
+
+            #Run RAxML
+            system('rm RAxML_*')
+            raxml(folder_name + 'sequences.fa', 'nwk')
+            rax = Tree('RAxML_bestTree.nwk')
+            rax.set_outgroup(rax.get_midpoint_outgroup())
+            name(rax)
+            writeTree(rax, folder_name + 'RAxML_bestTree.nwk')
 
             guestCases += 1
 
@@ -383,7 +406,7 @@ def testLikelihood(checkpoint=False):
                     name(raxml_tree)
                     raxml_tree = reroot(host, raxml_tree, genMap(host, raxml_tree))
 
-                    result = raxml_score_from_file('RAxml_bestTree.nwk', 'guest.nwk', 'sequences.fa')
+                    result = raxml_score_from_file('RAxML_bestTree.nwk', 'guest.nwk', 'sequences.fa')
                     score = result[1][0]
                     if score == 0:
                         successes += 1
@@ -416,9 +439,9 @@ def treeSearchTest(n=100):
     """
 
     from TreeSearch import reroot, pick_sprs, reconcileDL
-    from matplotlib import pyplot as plt
-    import seaborn as sns
-    sns.set()
+    #from matplotlib import pyplot as plt
+    #import seaborn as sns
+    #sns.set()
 
     def genMap(host, guest):
         #{guest -> host}
@@ -438,8 +461,10 @@ def treeSearchTest(n=100):
     #Generate host and guest tree
     print "Generating Trees"
     host, guest, names, seqs = withHost(8, .3) #Experimentally determined from testLikelihood()
-    guest = guest.children[0]
-    guest.up = None
+    assert(len(names) == len(guest))
+    #guest = guest.children[0]
+    #guest.up = None
+    assert(len(names) == len(guest))
     name(guest)
     name(host)
 
@@ -466,6 +491,8 @@ def treeSearchTest(n=100):
     name(raxml_tree)
     raxml_tree = reroot(host, raxml_tree, genMap(host, raxml_tree))
 
+    print len(seqs), len(guest), len(raxml_tree)
+
     #Get ML score of RAxML tree
     f = list(open('RAxML_info.nwk'))
     raxml_mlscore = 0
@@ -475,7 +502,8 @@ def treeSearchTest(n=100):
 
     #Check if guest tree is significantly worse than raxml tree
     print "Evaluating Guest Tree"
-    result = raxml_score_from_file('RAxml_bestTree.nwk', 'guest.nwk', 'sequences.fa')
+    result = raxml_score_from_file('RAxML_bestTree.nwk', 'guest.nwk', 'sequences.fa')
+    print result
     guest_score = result[0][0]
     score = result[1][0]
     if score == 0:
@@ -483,6 +511,7 @@ def treeSearchTest(n=100):
     else:
         print "Guest Tree is Significantly Worse than RAxML Tree"
 
+    """
     #Generate/Score n random trees
     print "Random Trees"
     random = createRandomTrees(guest, n, 'badTrees.nwk')
@@ -512,6 +541,7 @@ def treeSearchTest(n=100):
     plt.ylabel('RAxML Score')
     plt.legend((a,b,c,d),('random','real','1SPR','RAxML best'))
     plt.show()
+    """
 
 def emMatTest(bl=1):
     from CreateSequences import genTransitionMatrix
@@ -608,5 +638,5 @@ if __name__ == "__main__":
         #seqGenTest(100, bl)
     #seqDiff(bl=.5)
     #testLikelihood()
-    #generateTestCases(10)
+    #generateTestCases(500)
     print '\n', datetime.now().strftime('%Y-%m-%d %H:%M:%S')
