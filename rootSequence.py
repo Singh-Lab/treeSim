@@ -94,6 +94,9 @@ def genRandomSequence2(numDoms):
     newSeq = newSeq.translate(None, string.ascii_lowercase)
     newSeq = newSeq.translate(None, 'BJOUXZ')
 
+    if len(findDomains(newSeq, hmmfile)[0]) != numDoms:
+        return genRandomSequence2(numDoms)
+
     return newSeq
 
 if __name__ == '__main__':

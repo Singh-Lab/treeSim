@@ -3,7 +3,7 @@
 
 from ete3 import Tree
 import numpy as np
-from TreeUtils import findDomains, findMotifs, isValid, printDomSeq
+from TreeUtils import isValid, printDomSeq
 from stats import exp, drawFromDiscrete
 from math import log
 from pyvolve import Model, Partition, Evolver, read_tree
@@ -11,22 +11,21 @@ from OrthoAnalysis import selfSimilarity
 from scipy.linalg import expm
 from ConfigParser import ConfigParser as CP
 
-HMMER = eval(CP.USE_HMMER) #Uses hmmer if true, mast if false (Must change config file accordingly)
-
 #####################################
 #                                   #
 #        Atomic Sequence Ops        #
 #                                   #
 #####################################
 
-def duplicate(sequence, hmmfile, domNumber, length):
+def duplicate(sequence, starts, ends, domNumber, length):
     """
     Given a sequence and a domain number (ith domain in sequence), duplicates this 
     domain in the sequence.
 
     Args:
         sequence: The full gene sequence (including both domain and linker regions)
-        hmmfile: hmm file containing hmm of domain to be duplicated
+        starts: Starting position of every domain in the sequence
+        ends: ending position of every domain in the sequence
         domNumber: The position of the domain to be duplicated w.r.t. the other domains
 		length: Length (#domains) involved in duplication
 
@@ -34,40 +33,50 @@ def duplicate(sequence, hmmfile, domNumber, length):
         sequence (str ): The sequence after the specified duplication.	
     """
     BASELINKER = 'TGEVK'
-    #BASELINKER = ''
-    if HMMER:
-        starts, ends = findDomains(sequence, hmmfile)[:2]
-    else:
-        starts, ends = findMotifs(sequence, hmmfile)[:2]
+    amount_added = ends[domNumber + length - 1] - starts[domNumber] + 1 + 5
 
     sequence = sequence[:ends[domNumber + length - 1] + 1] + BASELINKER + \
                     sequence[starts[domNumber]:]
 
-    return sequence
+    bstarts, bends = starts[:domNumber + length], ends[:domNumber + length]
+    estarts = [i + amount_added for i in starts[domNumber:]]
+    eends = [i + amount_added for i in ends[domNumber:]]
 
-def remove(sequence, hmmfile, domNumber):
+    starts, ends = bstarts + estarts, bends + eends
+
+    return sequence, starts, ends
+
+def remove(sequence, starts, ends, domNumber):
     """
     Deletes a specified domain in the input sequence. 
 
     Args:
         sequence: The full gene sequence (including both domain and linker regions)
-        hmmfile: hmm file containing hmm of domain to be removed
+        starts: Starting position of every domain in the sequence
+        ends: ending position of every domain in the sequence
         domNumber: The position of the domain to be duplicated w.r.t. the other domains
     Returns sequence with specified duplication
     """
-    if HMMER:
-        starts, ends = findDomains(sequence, hmmfile)[:2]
-    else:
-        starts, ends = findMotifs(sequence, hmmfile)[:2]
-
     #Removes one of the linkers if necessary
+
+    amount_removed = ends[domNumber] - starts[domNumber] + 1
+
     if domNumber > 0:
         sequence = sequence[:starts[domNumber] - 5] + sequence[ends[domNumber]+1:]
+        amount_removed += 5
     elif domNumber < len(starts) - 1:
         sequence = sequence[:starts[domNumber]] + sequence[ends[domNumber]+1+5:]
+        amount_removed += 5
     else:
         sequence = sequence[:starts[domNumber]] + sequence[ends[domNumber]+1:]
-    return sequence
+
+    #Remove domain from list, adjust positions of the others
+    starts.pop(domNumber), ends.pop(domNumber)
+    for i in range(domNumber, len(starts)):
+        starts[i] -= amount_removed
+        ends[i] -= amount_removed
+
+    return sequence, starts, ends
 
 #####################################
 #                                   #
@@ -100,7 +109,7 @@ def genTransitionMatrix(emissionProbs, transmat, branchLength):
         transmat[i][i] = 0
     transmat = [i / sum(i) for i in transmat]
 
-    return [transmat] * 80
+    return [transmat] * 100
     
     """
     out = []
@@ -161,13 +170,13 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs, transmat, hmmfile)
             character = drawFromDiscrete(row)
             
             seqCopy = seqCopy[:position] + alphabet[character] + seqCopy[position+1:]
-        invalid = not isValid(seqCopy, hmmfile)
-        #invalid = False
+        
+        #invalid = not isValid(seqCopy, hmmfile)
+        invalid = False
         invalidCounter += 1
         if invalidCounter >= 25:
             raise ValueError
 
-    #print (position, alphabet[oldChar], alphabet[character]),
     return seqCopy
 
 def evolveLinker(sequence, branchLength):
@@ -191,13 +200,15 @@ def evolveEmptyLinker(branchLength):
 
 #Simulates evolution of a full sequence including both domains and linker regions
 #Splits sequence into domain and linker regions, deals with each independently
-def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile, transmat):
+def evolveSequence(sequence, starts, ends, hmmfile, rate, branchLength, emissionProbs, transmat):
     """
     Putting the previous steps together, simulates evolutoin of a full sequence including 
     both domains and non-domain sequence. 
 
     Args:
         sequence (str):  The full sequence to be evolved
+        starts: Starting position of every domain in the sequence
+        ends: ending position of every domain in the sequence (+1)
         emissionsProbs:  matrix with dimensions (n x 20) where n is the length of 
                          the domain. Each row contains the probability of each 
                          aa appearing at that position (in pfam hmm order) 
@@ -207,11 +218,7 @@ def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile, transma
     original_sequence = sequence
     #END TESTING BLOCK
 
-    #Find domains, check if sequence begins and/or ends with a domain
-    if HMMER:
-        domains = findDomains(sequence, hmmfile)[2]
-    else:
-        domains = findMotifs(sequence, hmmfile)[2]
+    domains = [sequence[starts[i]:ends[i]+1] for i in range(len(starts))]
 
     #split on all domains
     for seq in domains:
@@ -234,6 +241,7 @@ def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile, transma
         for i in range(len(domains)):
             sequence += sequences[i] + domains[i]
     except:
+        print "EVOLVE SEQUENCE ERROR"
         print original_sequence
         print domains
         print sequences
@@ -245,7 +253,7 @@ def evolveSequence(sequence, rate, branchLength, emissionProbs, hmmfile, transma
     return sequence
 
 #TODO: Need a better name for this function
-def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename, transmat):
+def domainOrder(sequence, starts, ends, rate, emissionProbs, hmmfile, tree, hnodename, transmat):
     """
     Evolves sequence along domain subtree within a single host node. Assumes that every
     node in the domain tree has an event assigned. Requires that every root has a position
@@ -271,7 +279,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename, transma
         workingSet.remove(node)
         if dist > 0:
             #print 'evolving for:', dist, '\n'
-            sequence = evolveSequence(sequence, rate, dist, emissionProbs, hmmfile, transmat)
+            sequence = evolveSequence(sequence, starts, ends, hmmfile, rate, dist, emissionProbs, transmat)
 
         for job in jobs:
             job[0] -= dist
@@ -290,7 +298,7 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename, transma
             td.sort()
             size = len(td)
 
-            sequence = duplicate(sequence, hmmfile, td[0][1].position, size)
+            sequence, starts, ends = duplicate(sequence, starts, ends, td[0][1].position, size)
 
             #increment position of all the succeeding domains
             for otherNode in workingSet:
@@ -309,14 +317,15 @@ def domainOrder(sequence, rate, hmmfile, emissionProbs, tree, hnodename, transma
                 jobs.append([b.dist, b])
 
         if node.event == 'LOSS':
-            sequence = remove(sequence, hmmfile, node.position)
+            sequence, starts, ends = remove(sequence, starts, ends, node.position)
             for otherNode in workingSet:
                 if otherNode.position >= node.position: #Why does this have to be >= instead of > ?
                     otherNode.position -= 1
 
-    return sequence
+    return sequence, starts, ends
 
-def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProbs, transmat):
+def evolveAlongTree(host, guest, reverseMap, rootSequence, rootStarts, rootEnds, 
+                        hmmfile, emissionProbs, transmat):
     """
     Evolves a root sequence along an entire host tree, taking into account the domain level 
     events present in the guest tree (duplication, loss, speciation)
@@ -326,6 +335,8 @@ def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProb
         guest (Tree)      : The guest tree over which to evolve a sequence 
         reverseMap (dict) : mapping from nodes in the host node -> guest nodes 
         rootSequence (str): Initial sequence to evolve. Should contain sequence with ONE domain
+        rootStarts (list) :
+        rootEnds (list)   :
         hmmfile (str )    : path to hmmfile used to identify domains
         emissionProbs     : matrix with dimensions (n x 20) where n is the length of 
                             the domain. Each row contains the probability of each 
@@ -334,14 +345,20 @@ def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProb
 
     for node in host.traverse():
         node.add_feature('sequence', "")
+        node.add_feature('starts', [])
+        node.add_feature('ends', [])
 
     for hostNode in host.traverse():
         tempSequence = rootSequence if hostNode == host else hostNode.up.sequence
+        starts = rootStarts if hostNode == host else hostNode.up.starts
+        ends = rootEnds if hostNode == host else hostNode.up.ends
 
         #No events occured at this node
         if hostNode not in reverseMap:
-            hostNode.sequence = evolveSequence(tempSequence, 0.05, hostNode.dist, \
-                                    emissionProbs, hmmfile, transmat)
+            hostNode.sequence = evolveSequence(tempSequence, starts, ends, hmmfile, 1, \
+                                    hostNode.dist, emissionProbs, transmat)
+            hostNode.starts = starts
+            hostNode.ends = ends
             continue
 
         allGuestNodes = reverseMap[hostNode]
@@ -370,8 +387,12 @@ def evolveAlongTree(host, guest, reverseMap, rootSequence, hmmfile, emissionProb
             t = guest
 
         #Actually do the work
-        tempSequence = domainOrder(tempSequence, .75, hmmfile, emissionProbs, t, hostNode.name, transmat)
+        tempSequence, starts, ends = domainOrder(tempSequence, starts, ends, \
+                                                .75, emissionProbs, hmmfile, \
+                                                t, hostNode.name, transmat)
         hostNode.sequence = tempSequence
+        hostNode.starts = starts
+        hostNode.ends = ends
 
         #Reconnect all root and leaf nodes to the rest of the guest tree
         for node in upAncestors:
@@ -409,6 +430,6 @@ if __name__ == '__main__':
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .2, gaussNoise, sd)
 
     rootSequence = grs(sd)
-    transmat = CP.TRANSMAT #pylint: disable=no-member
-    evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs, transmat)
+    transmat = pickle.load(CP.TRANSMAT) #pylint: disable=no-member
+    #evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs, transmat)
     selfSimilarity('asdf', hostTree.sequence, hmmfile, True) #pylint: disable=no-member

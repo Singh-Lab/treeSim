@@ -8,7 +8,7 @@ from GuestTreeGen import buildGuestTree, exp, expon
 from CreateSequences import evolveAlongTree, evolveSequence
 from stats import gaussNoise
 from rootSequence import genRandomSequence2 as grs
-from TreeUtils import findDomains, findMotifs, raxml, raxml_score, raxml_score_from_file
+from TreeUtils import findSubsequences, raxml, raxml_score, raxml_score_from_file
 from TreeUtils import writeMapping, writeFasta, writeTree, genMap
 from TreeUtils import generateFakeSequence as gfs
 from random import randint
@@ -24,7 +24,7 @@ transmat = pickle.load(open(CP.TRANSMAT)) #pylint: disable=no-member
 emissionProbs = pickle.load(open(eppath))
 hmmfile = CP.HMM_PATH #pylint: disable=no-member
 
-HMMER = eval(CP.USE_HMMER)
+#HMMER = eval(CP.USE_HMMER) #pylint: disable=no-member
 
 def name(tree):
     i = 100
@@ -65,15 +65,13 @@ def generateIQTree():
     guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .2, gaussNoise, sd)
 
     rootSequence = grs(sd)
-    evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs, transmat)
+    starts, ends = findSubsequences(rootSequence, hmmfile)[:2]
+    evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, starts, ends, hmmfile, emissionProbs, transmat)
 
     names, seqs = [], []
 
     for node in hostTree:
-        if HMMER:
-            seqs += findDomains(node.sequence, hmmfile)[2]
-        else:
-            seqs += findMotifs(node.sequence, hmmfile)[2]
+        seqs += findSubsequences(node.sequence, hmmfile)[2]
         gnodes = findLeaves(nodeMap[node])
         n = [(leaf.position, leaf.name) for leaf in gnodes if leaf.event != 'LOSS']
         n.sort()
@@ -84,11 +82,8 @@ def generateIQTree():
     outgroup.up = guestTree
     guestTree.children.append(outgroup)
     outgroup.name = 'Outgroup'
-    outseq = evolveSequence(rootSequence, .1, 2, emissionProbs, hmmfile, transmat)
-    if HMMER:
-        outseq = findDomains(outseq, hmmfile)[2][0]
-    else:
-        outseq = findMotifs(outseq, hmmfile)[2][0]
+    outseq = evolveSequence(rootSequence, starts, ends, hmmfile, 1, 2, emissionProbs, transmat)
+    outseq = findSubsequences(outseq, hmmfile)[2][0]
     outgroup.add_feature('sequence', outseq)
     seqs.insert(0, outseq)
     names.insert(0, 'Outgroup')
@@ -185,9 +180,14 @@ def withHost(numLeaves = 4, bl = .5, hostTree = None):
         leaf.dist += extralen
 
     #rootSequence = grs(sd)
-    rootSequence = gfs('60_emissions.fa', 40)
+    rootSequence = gfs('../treeSim_data/emissions/background_emissions.fa', 40)
+    #starts, ends = findSubsequences(rootSequence, hmmfile)[:2]
+    starts, ends = [40], [40 + 50 - 1]
+    if len(starts) == 0:
+        print 'fuck'
+        raise Exception
 
-    evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, hmmfile, emissionProbs, transmat)
+    evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, starts, ends, hmmfile, emissionProbs, transmat)
     names = [(leaf.position, leaf.name) for leaf in guestTree if leaf.event != 'LOSS']
     names.sort()
     names = [i[1] for i in names]
@@ -196,10 +196,9 @@ def withHost(numLeaves = 4, bl = .5, hostTree = None):
     seqs = []
     hnodes = sorted([i.name for i in hostTree]) 
     for node in hnodes:
-        if HMMER:
-            seqs += findDomains((hostTree&node).sequence, hmmfile)[2]
-        else:
-            seqs += findMotifs((hostTree&node).sequence, hmmfile)[2]
+        realnode = hostTree&node
+        for (start, end) in zip(realnode.starts, realnode.ends):
+            seqs.append(realnode.sequence[start:end+1])
 
     for node in hostTree.traverse():
         node.del_feature('leaves')
@@ -364,6 +363,7 @@ def testLikelihood(checkpoint=False):
     if not checkpoint:
         for nl in [4,6,8,10,12]:
             for bl in np.arange(.05, .55, .05):
+                print (nl, bl)
 
                 #it = ((nl - 4) + 1) / 2 * 10 + bl / .5 * 5
                 #printProgressBar(it, 10)
@@ -379,8 +379,6 @@ def testLikelihood(checkpoint=False):
                         except:
                             continue
 
-                    guest = guest.children[0]
-                    guest.up = None
                     name(guest)
                     name(host)
 
@@ -422,6 +420,7 @@ def testLikelihood(checkpoint=False):
     else:
         nLeaves, bLengths, colors = pickle.load(open('plot_data.pickle'))
 
+    plt.figure(dpi=150)
     plt.scatter(nLeaves, bLengths, color=colors)
     plt.title('Acceptable BL Ranges for Each Host Tree Size')
     plt.xlabel('# of Host Leaves')
@@ -584,8 +583,9 @@ def seqGenTest(n=500, bl=1):
 
     for i in range(n):
         seq = grs(5)
+        starts, ends = findSubsequences(seq, hmmfile)[:2]
         try:
-            evolveSequence(seq, .1, bl, emissionProbs, hmmfile, transmat)
+            evolveSequence(seq, starts, ends, hmmfile, 1, bl, emissionProbs, transmat)
         except ValueError:
             failcount += 1
         suff = str(failcount) + ' / ' + str(i+1) + ' failures'
@@ -597,20 +597,15 @@ def seqDiff(n=10, bl=1):
     NORMAL = '\033[0m'
 
     seq = grs(1)
-    if HMMER:
-        dom = findDomains(seq, hmmfile)[2][0]
-    else:
-        dom = findMotifs(seq, hmmfile)[2][0]
+    starts, ends = findSubsequences(seq, hmmfile)[:2]
+    dom = findSubsequences(seq, hmmfile)[2][0]
     print dom
 
     iterations = 0
     while iterations < n:
         try:
-            temp = evolveSequence(seq, .05, bl, emissionProbs, hmmfile, transmat)
-            if HMMER:
-                tempdom = findDomains(temp, hmmfile)[2][0]
-            else:
-                tempdom = findMotifs(temp, hmmfile)[2][0]
+            temp = evolveSequence(seq, starts, ends, hmmfile, 1, bl, emissionProbs, transmat)
+            tempdom = findSubsequences(temp, hmmfile)[2][0]
             out = ""
             nMuts = 0
             for i in range(len(dom)):

@@ -137,7 +137,8 @@ def BDMinMax(birthRate, deathRate, treeHeight, minLeaves = 0, maxLeaves = float(
     mean = 1./(1./birthRate - 1./deathRate)
 
     if minLeaves > 2 * mean or maxLeaves < 0:
-        print """
+        print 
+    """
 
     incorrect = True
 

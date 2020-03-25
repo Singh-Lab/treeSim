@@ -6,7 +6,6 @@ import numpy as np
 import os
 from ConfigParser import ConfigParser as CP
 
-HMMER = eval(CP.USE_HMMER)
 alphabet = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 
                 'T', 'V', 'W', 'Y']
 
@@ -244,7 +243,7 @@ def findMotifsFile(infile, mfile):
     """
     
     #Switch from MAST to FIMO
-    os.system("fimo --text --thresh .001 " + mfile + " " + infile + " > tmp/mast_output.txt 2> crap.txt")
+    os.system("fimo --text --thresh .01 " + mfile + " " + infile + " > tmp/mast_output.txt 2> crap.txt")
     f = list(open('tmp/mast_output.txt'))
     
     for line in f:
@@ -295,6 +294,11 @@ def findMotifs(sequence, mfile):
     
     return findMotifsFile('tmp/tmp.fa', mfile)
 
+def findSubsequences(sequence, mfile):
+    if eval(CP.USE_HMMER): #pylint: disable=no-member
+        return findDomains(sequence, mfile)
+    return findMotifs(sequence, mfile)
+
 def printDomSeq(sequence, hmmfile, minimal_rep = False):
     """
     prints the sequence with domains highlighted in red 
@@ -313,10 +317,7 @@ def printDomSeq(sequence, hmmfile, minimal_rep = False):
     NORMAL = '\033[0m'
 
     #Find domains, check if sequence begins and/or ends with a domain
-    if HMMER:
-        domains = findDomains(sequence, hmmfile)[2]
-    else:
-        domains = findMotifs(sequence, hmmfile)[2]
+    domains = findSubsequences(sequence, hmmfile)[2]
 
     #split on all domains
     for domain in domains:
@@ -344,7 +345,7 @@ def isValid(domain, hmmfile):
     """Checks if the input string is a valid zf-C2H2 domain"""
 
     #Can HMMER/MAST find it?
-    if HMMER:
+    if eval(CP.USE_HMMER): #pylint: disable=no-member
         seqs = findDomains(domain, hmmfile)[2]
         #Assumes that we are using zf if we are using an hmm instead of a motif
         valid = len(domain) == 23 and domain[2] == "C" and domain[5] == "C"
@@ -352,7 +353,7 @@ def isValid(domain, hmmfile):
     else:
         seqs = findMotifs(domain, hmmfile)[2]
         valid = True
-    if len(seqs) > 0 and domain != seqs[0]:
+    if len(seqs) == 0 or (len(seqs) > 0 and domain != seqs[0]):
         return False
 
     return valid
