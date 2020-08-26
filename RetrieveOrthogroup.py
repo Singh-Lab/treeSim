@@ -96,8 +96,6 @@ def fastaToSeqs(fasta):
         else:
             sequences.append(fasta[i])
 
-    print headers, sequences
-
     speciesIDs = [line.split(":")[0][1:] for line in headers]
     names = [line.split('"pub_gene_id":')[1].split(',')[0].strip('"') for line in headers]
     names = [thing.split(';')[1] if ';' in thing else thing for thing in names]

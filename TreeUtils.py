@@ -1,7 +1,7 @@
 #Provides several utility functions useful for reading/writing trees, etc
 from ete3 import Tree
 from math import exp
-from Utils import sortBy
+from Utils import sortBy, printProgressBar
 import numpy as np
 import os
 from ConfigParser import ConfigParser as CP
@@ -228,22 +228,9 @@ def findMotifsFile(infile, mfile):
     """
     starts, ends, seqs = [], [], []
     sequence = list(open(infile))[1].strip()
-
-    """
-    os.system("mast -hit_list -mt .001 " + mfile + " " + infile + " > tmp/mast_output.txt 2> crap.txt")
-    f = list(open('tmp/mast_output.txt'))
-
-    for line in f:
-        if line[0] != "#":
-            temp = line.split()
-            starts.append(int(temp[4]) - 1) #MAST is 1-indexed :(
-            ends.append(int(temp[5]) - 1)
-            seqs.append(sequence[int(temp[4]) - 1 : int(temp[5])])
-            
-    """
     
     #Switch from MAST to FIMO
-    os.system("fimo --text --thresh .01 " + mfile + " " + infile + " > tmp/mast_output.txt 2> crap.txt")
+    os.system("fimo --text --thresh 1 " + mfile + " " + infile + " > tmp/mast_output.txt 2> crap.txt")
     f = list(open('tmp/mast_output.txt'))
     
     for line in f:
@@ -337,6 +324,40 @@ def printDomSeq(sequence, hmmfile, minimal_rep = False):
     out = ''
     for i in range(len(domains)):
         out += sequences[i] + GREEN + domains[i][0] + RED + domains[i][1:] + NORMAL
+    out += sequences[-1] #if len(sequences) > len(domains) else RED + domains[-1] + NORMAL
+
+    print out
+
+def printDomSeq2(sequence, starts, ends):
+    """
+    prints the sequence with domains highlighted in red 
+    (first character highlighted in green)
+    Uses known domain start and end positions rather than finding them
+
+    Args:
+    sequence (str): Protein sequence to print
+    hmmfile  (str): Path to hmm file of domain to highlight
+    mimimal_rep (bool): If true, prints a string of dashes and X's (nondomain and domain
+                        sequences) rather than the full highlighted sequences
+    """
+
+    #Escape sequences used to colorize terminal output
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    NORMAL = '\033[0m'
+
+    #Find domains, check if sequence begins and/or ends with a domain
+    domains = [sequence[starts[i]:ends[i]+1] for i in range(len(starts))]
+
+    #split on all domains
+    for domain in domains:
+        sequence = sequence.replace(domain, "xxx")
+    sequences = sequence.split("xxx")
+    
+    #Reassemble full sequence post evolution
+    out = ''
+    for i in range(len(domains)):
+        out += sequences[i] + '\n' + GREEN + domains[i][0] + RED + domains[i][1:] + NORMAL + '\n'
     out += sequences[-1] #if len(sequences) > len(domains) else RED + domains[-1] + NORMAL
 
     print out
@@ -456,49 +477,54 @@ def raxml_score(benchTree, testTrees, seqfile):
     return scores, worse
 
 #TODO: only tested with Tree and dictionary inputs, not file inputs
-def run_treefix(host, guest, lmap, sequences):
-    os.system('mkdir -p tfix/config/; mkdir -p tfix/data/0/')
+def run_treefix(host, guest, lmap, sequences, short=True, suffix = ''):
+    os.system('mkdir -p tfix' + suffix + '/config/; mkdir -p tfix' + suffix + '/data/0/')
 
     if type(host) == str:
-        os.system('cp ' + host + ' tfix/config/host.stree')
+        os.system('cp ' + host + ' tfix' + suffix + '/config/host.stree')
     else:
-        writeTree(host, 'tfix/config/host.stree')
+        writeTree(host, 'tfix' + suffix + '/config/host.stree')
 
     #guest is a path to a tree file
     if type(guest) == str:
-        os.system('cp ' + guest + ' tfix/data/0/0.nt.raxml.tree')
+        os.system('cp ' + guest + ' tfix' + suffix + '/data/0/0.nt.raxml.tree')
     #guest is a tree object
     else:
-        writeTree(guest, 'tfix/data/0/0.nt.raxml.tree')
+        writeTree(guest, 'tfix' + suffix + '/data/0/0.nt.raxml.tree')
 
     #lmap is a file
     if type(lmap) == str:
-        os.system('cp ' + lmap + 'tfix/config/guest.smap')
+        os.system('cp ' + lmap + ' tfix' + suffix + '/config/guest.smap')
     #lmap is a dictionary of guest -> host nodes
     else:
-        f = open('tfix/config/guest.smap', 'w')
+        f = open('tfix' + suffix + '/config/guest.smap', 'w')
         for key in lmap:
             f.write(key.name + '\t' + lmap[key].name + '\n')
         f.close()
 
     #sequences is always a path to a fasta file
-    os.system('cp ' + sequences + ' tfix/data/0/0.nt.align')
+    os.system('cp ' + sequences + ' tfix' + suffix + '/data/0/0.nt.align')
 
     #Run TreeFix
-    cmd = 'treefix -s tfix/config/host.stree'
-    cmd += ' -S tfix/config/guest.smap' 
+    cmd = 'treefix -s tfix' + suffix + '/config/host.stree'
+    cmd += ' -S tfix' + suffix + '/config/guest.smap' 
     cmd += ' -A nt.align '
     cmd += ' -o nt.raxml.tree' 
     cmd += ' -n nt.raxml.treefix.tree'
     cmd += ' -V 0'
     cmd += ' -l data/0/0.nt.raxml.treefix.log'
     cmd += ' -e " -m PROTGAMMAJTT"'
-    cmd += ' tfix/data/0/0.nt.raxml.tree'
+    cmd += ' tfix' + suffix + '/data/0/0.nt.raxml.tree'
 
+    if not short:
+        cmd += ' --niter=1000'
+        cmd += ' --nquickiter=100'
+        cmd += ' --freconroot=1'
+    
     os.system(cmd)
 
-    out = Tree('tfix/data/0/0.nt.raxml.treefix.tree')
-    os.system('rm -r tfix')
+    out = Tree('tfix' + suffix + '/data/0/0.nt.raxml.treefix.tree')
+    os.system('rm -r tfix' + suffix)
     return out
 
 def generateFakeSequence(domfile, l=100):
@@ -508,4 +534,6 @@ def generateFakeSequence(domfile, l=100):
     start = ''.join([np.random.choice(alphabet) for _ in range(l)])
     end = ''.join([np.random.choice(alphabet) for _ in range(l)])
     doms = list(open(domfile))[1::2]
-    return start + np.random.choice(doms)[:-1] + end
+    starts = [l]
+    ends = [l + len(doms[0]) - 1]
+    return starts, ends, start + np.random.choice(doms)[:-1] + end

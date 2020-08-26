@@ -229,8 +229,9 @@ def reconcile(host, guest, leafmap):
     eqnames, rhs, coldict = createEqns(host, guest, h, g, mapping, d)
     write('treesolve.mps', eqnames, rhs, coldict)
 
+    setParam('outputflag', 0) #pylint: disable=undefined-variable
     m = read('treesolve.mps') # pylint: disable=undefined-variable
-    m.Params.outputflag = 0
+    m.Params.OutputFlag = 0
     m.optimize()
     cost = m.getObjective().getValue()
 

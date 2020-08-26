@@ -3,7 +3,7 @@
 
 from ete3 import Tree
 import numpy as np
-from TreeUtils import isValid, printDomSeq
+from TreeUtils import isValid, printDomSeq2
 from stats import exp, drawFromDiscrete
 from math import log
 from pyvolve import Model, Partition, Evolver, read_tree
@@ -135,6 +135,8 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs, transmat, hmmfile)
         transmat (list):       aa transition matrix with dimensions (20 x 20) 
     """
 
+    return evolveLinker(sequence, branchLength)
+    """
     invalid = True
     
     #Returns the number of mutations that occur on a branch with time t
@@ -145,6 +147,9 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs, transmat, hmmfile)
             count += 1
             t -= exp(rate * 1./len(sequence))
         return count
+    
+
+    #numMutations = lambda t: int(t * len(sequence))
 
     #Entropy of a probability distribution
     def entropy(line):
@@ -178,6 +183,7 @@ def evolveDomain(sequence, rate, branchLength, emissionProbs, transmat, hmmfile)
             raise ValueError
 
     return seqCopy
+    """
 
 def evolveLinker(sequence, branchLength):
     """
@@ -185,6 +191,8 @@ def evolveLinker(sequence, branchLength):
     (no indels). branchLength * sequence is the expected fraction of positions to mutate (with
     replacement). Returns sequence post modification.
     """
+    if sequence == '':
+        return evolveEmptyLinker(branchLength)
     m = Model("JTT")
     p = Partition(models = m, root_sequence = sequence)
     #t = (A:BL,b:BL)
@@ -196,7 +204,8 @@ def evolveLinker(sequence, branchLength):
 def evolveEmptyLinker(branchLength):
     """Inserts and evolves a template linker when no linker exists"""
     BASELINKER = 'TGEVK'
-    return evolveLinker(BASELINKER, branchLength)
+    #return evolveLinker(BASELINKER, branchLength)
+    return ''
 
 #Simulates evolution of a full sequence including both domains and linker regions
 #Splits sequence into domain and linker regions, deals with each independently
@@ -245,7 +254,7 @@ def evolveSequence(sequence, starts, ends, hmmfile, rate, branchLength, emission
         print original_sequence
         print domains
         print sequences
-        printDomSeq(original_sequence, hmmfile)
+        printDomSeq2(original_sequence, starts, ends)
         raise Exception
 
     sequence += sequences[-1] if len(sequences) > len(domains) else domains[-1]
@@ -253,7 +262,7 @@ def evolveSequence(sequence, starts, ends, hmmfile, rate, branchLength, emission
     return sequence
 
 #TODO: Need a better name for this function
-def domainOrder(sequence, starts, ends, rate, emissionProbs, hmmfile, tree, hnodename, transmat):
+def domainOrder(sequence, starts, ends, rate, emissionProbs, hmmfile, tree, transmat):
     """
     Evolves sequence along domain subtree within a single host node. Assumes that every
     node in the domain tree has an event assigned. Requires that every root has a position
@@ -276,13 +285,18 @@ def domainOrder(sequence, starts, ends, rate, emissionProbs, hmmfile, tree, hnod
     while len(jobs) != 0:
         jobs.sort() #sorts jobs by distance from the root
         dist, node = jobs.pop(0)
+        #print 'Working On:', node.name, dist, [temp.name for temp in workingSet]
         workingSet.remove(node)
         if dist > 0:
-            #print 'evolving for:', dist, '\n'
+            #print 'evolving for:', dist
             sequence = evolveSequence(sequence, starts, ends, hmmfile, rate, dist, emissionProbs, transmat)
+            #printDomSeq2(sequence, starts, ends)
 
         for job in jobs:
             job[0] -= dist
+
+        p = node.position
+        node.domSeq = sequence[starts[p]:ends[p]+1]
 
         #Only need to deal with duplication and loss events explicitly;
         #speciation and leaf nodes require no work
@@ -299,6 +313,8 @@ def domainOrder(sequence, starts, ends, rate, emissionProbs, hmmfile, tree, hnod
             size = len(td)
 
             sequence, starts, ends = duplicate(sequence, starts, ends, td[0][1].position, size)
+            #print 'Duplicated domain', td[0][1].position, 'size', size, 'new sequence:'
+            #printDomSeq2(sequence, starts, ends)
 
             #increment position of all the succeeding domains
             for otherNode in workingSet:
@@ -318,11 +334,73 @@ def domainOrder(sequence, starts, ends, rate, emissionProbs, hmmfile, tree, hnod
 
         if node.event == 'LOSS':
             sequence, starts, ends = remove(sequence, starts, ends, node.position)
+            #print 'Removed domain at position', node.position
+            #printDomSeq2(sequence, starts, ends)
             for otherNode in workingSet:
                 if otherNode.position >= node.position: #Why does this have to be >= instead of > ?
                     otherNode.position -= 1
 
     return sequence, starts, ends
+
+def domainOrderNew(sequence, starts, ends, rate, emissionProbs, hmmfile, tree, transmat):
+
+    def singleRoot(domSeq, rate, intree):
+        for node in intree.traverse():
+            node.add_feature('domSeq','')
+
+        intree.domSeq = domSeq
+        for node in intree.traverse():
+            if node == intree:
+                node.domSeq = evolveDomain(node.domSeq, rate, node.dist, emissionProbs, transmat, hmmfile)
+            else:
+                node.domSeq = evolveDomain(node.up.domSeq, rate, node.dist, emissionProbs, transmat, hmmfile)
+
+        return [node.domSeq for node in intree]
+
+    def dupLinker(seq, domSeq, intree, offset=0):
+
+        temp = seq.replace(domSeq, 'xxx')
+
+        startRegions = temp.split('xxx')
+        #Dummy code for now
+        numLinkers = len(intree)-1
+        s = len(startRegions[0])
+        k = len(domSeq)
+        starts = [offset + s + (5 + k) * i for i in range(len(intree))]
+        ends = [offset + s + (5 + k) * i + k - 1 for i in range(len(intree))]
+        return starts, ends, [startRegions[0]] + ['TGEVK'] * numLinkers + [startRegions[1]]
+
+    jobs = [(node.position, node) for node in tree.children]
+    jobs.sort()
+
+    allDoms = []
+    newStarts, newEnds = [], []
+    newSeq = ''
+    for i in range(len(starts)):
+        allDoms.append(singleRoot(sequence[starts[i]:ends[i]+1], rate, jobs[i][1]))
+        domSeq = sequence[starts[i]:ends[i]+1]
+        if i == 0:
+            if len(starts) > 1:
+                s, e, linkers = dupLinker(sequence[:starts[1]], domSeq, jobs[i][1])
+            else:
+                s, e, linkers = dupLinker(sequence, domSeq, jobs[i][1])
+        elif i == len(starts) - 1:
+            s, e, linkers = dupLinker(sequence[starts[i]:], domSeq, jobs[i][1], len(newSeq))
+        else:
+            s, e, linkers = dupLinker(sequence[starts[i]:starts[i+1]], domSeq, jobs[i][1], len(newSeq))
+        
+        #Assemble the shits
+        temp = ''
+        for j in range(len(allDoms[i])):
+            temp += linkers[j] + allDoms[i][j]
+        temp += linkers[-1]
+
+        newSeq += temp
+        newStarts += s
+        newEnds += e
+
+    return newSeq, newStarts, newEnds
+
 
 def evolveAlongTree(host, guest, reverseMap, rootSequence, rootStarts, rootEnds, 
                         hmmfile, emissionProbs, transmat):
@@ -389,7 +467,7 @@ def evolveAlongTree(host, guest, reverseMap, rootSequence, rootStarts, rootEnds,
         #Actually do the work
         tempSequence, starts, ends = domainOrder(tempSequence, starts, ends, \
                                                 .75, emissionProbs, hmmfile, \
-                                                t, hostNode.name, transmat)
+                                                t, transmat)
         hostNode.sequence = tempSequence
         hostNode.starts = starts
         hostNode.ends = ends

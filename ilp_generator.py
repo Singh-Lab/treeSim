@@ -78,10 +78,12 @@ def createEqns(h, g, hrep, grep, mapping, distmat, eqns='ALL'):
                     addcolumn(namevar("Y", [u.label, v.label, i, j]), distmat[i][j]-1, "COST", coldict)
                     addcolumn(namevar("Y", [u.label, w.label, i, j]), distmat[i][j]-1, "COST", coldict)
         for k in range(1,6):
-            coeff = -1.5 * ((k - 1.) / k)
+            #c = -1.5
+            c = -2
+            coeff = c * ((k - 1.) / k)
             addcolumn(namevar("T", [u.label, k]), coeff, "COST", coldict)
 
-    #(0) - Mapping Equalities
+    #(0.0) - Mapping Equalities
     if eqns == "ALL" or 0 in eqns:
         eqcounter = 0
         for u in mapping:
@@ -95,6 +97,18 @@ def createEqns(h, g, hrep, grep, mapping, distmat, eqns='ALL'):
                 else:
                     addrhs(eqname, 0, rhs)
                 addcolumn(varname, 1, eqname, coldict)
+
+    #(0.1) - Duplication Invariants
+    if eqns == "ALL" or 0 in eqns:
+        eqcounter = 0
+        for u in g:
+            assert u.children == []
+            varname = namevar("X", [u.label, u.label])
+            eqname = "DUP_INVAR" + str(eqcounter)
+            eqnames.append(" E " + eqname)
+            eqcounter += 1
+            addrhs(eqname, 0, rhs)
+            addcolumn(varname, 1, eqname, coldict)
 
     #(2)
     if eqns == "ALL" or 2 in eqns:

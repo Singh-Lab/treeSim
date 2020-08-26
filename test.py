@@ -163,7 +163,7 @@ def noHost(samples):
 
     f.close()
 
-def withHost(numLeaves = 4, bl = .5, hostTree = None):
+def withHost(numLeaves = 4, bl = .5, hostTree = None, iteration=None):
     sd = 1 #startingDomains
     extralen = .05
 
@@ -172,33 +172,44 @@ def withHost(numLeaves = 4, bl = .5, hostTree = None):
         for leaf in hostTree:
             leaf.dist += extralen
 
-    dupFunc = lambda x, y: 1
-    #guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .1, gaussNoise, sd)
-    guestTree, nodeMap = buildGuestTree(hostTree, s2, dupFunc, .1, gaussNoise, sd)
+    #dupFunc = lambda x, y: 1
+    guestTree, nodeMap = buildGuestTree(hostTree, s2, expfunc, .06, gaussNoise, sd)
+    #guestTree, nodeMap = buildGuestTree(hostTree, s2, dupFunc, .1, gaussNoise, sd)
+    if len(guestTree) < 4:
+        raise Exception
+
+    #check for td's
+    dn = []
+    for node in guestTree.traverse():
+        if 'dupNumber' in node.features:
+            dn.append(node.dupNumber)
+    
+    if len(dn) > len(set(dn)):
+        tdfile = open('ig3_tandem_duplications.txt','a')
+        tdfile.write(str(iteration) + '\n')
+        tdfile.close()
     
     for leaf in guestTree:
         leaf.dist += extralen
 
     #rootSequence = grs(sd)
-    rootSequence = gfs('../treeSim_data/emissions/background_emissions.fa', 40)
-    #starts, ends = findSubsequences(rootSequence, hmmfile)[:2]
-    starts, ends = [40], [40 + 50 - 1]
-    if len(starts) == 0:
-        print 'fuck'
-        raise Exception
+    starts, ends, rootSequence = gfs('../treeSim_data/emissions/ig_emissions.fa', 40)
+    #starts, ends = findSubsequences(rootSequence, hmmfile)[:2]    
 
     evolveAlongTree(hostTree, guestTree, nodeMap, rootSequence, starts, ends, hmmfile, emissionProbs, transmat)
+
+    sortkey = lambda x: x.split("_")[0]
     names = [(leaf.position, leaf.name) for leaf in guestTree if leaf.event != 'LOSS']
     names.sort()
     names = [i[1] for i in names]
-    names.sort()
+    names.sort(key=sortkey)
 
     seqs = []
     hnodes = sorted([i.name for i in hostTree]) 
     for node in hnodes:
         realnode = hostTree&node
         for (start, end) in zip(realnode.starts, realnode.ends):
-            seqs.append(realnode.sequence[start:end+1])
+            seqs.append(realnode.sequence[start:end])
 
     for node in hostTree.traverse():
         node.del_feature('leaves')
@@ -217,7 +228,7 @@ def generateTestCases(n=500):
     while hostCases < n / 10:
 
         try:
-            host = withHost(8, .3)[0]
+            host = withHost(8, .3, iteration=-1)[0]
         except:
             continue
 
@@ -227,17 +238,20 @@ def generateTestCases(n=500):
             printProgressBar(hostCases * 10 + guestCases, n)
 
             try:
-                guest = withHost(8, .3, host)[1]
+                guest = withHost(8, .3, host, hostCases * 10 + guestCases)[1]
             except:
                  continue
 
             writeMapping(genMap(host, guest), 'guest.map')
-            folder_name = '60_examples/' + str(hostCases*10 + guestCases) + '/'
-            system('mkdir ' + folder_name)
+            folder_name = '../treeSim_data/examples/ig3_td/' + str(hostCases*10 + guestCases) + '/'
+            system('mkdir -p ' + folder_name)
             system('mv host.nwk guest.nwk sequences.fa guest.map ' + folder_name)
             system('mv ' + folder_name + 'guest.nwk ' + folder_name + 'guest_full.nwk')
+            system('mv ' + folder_name + 'host.nwk ' + folder_name + 'host_full.nwk')
             guest.write(format=1, outfile=folder_name + 'guest.nwk')
+            host.write(format=1, outfile=folder_name + 'host.nwk')
 
+            """
             #Run RAxML
             system('rm RAxML_*')
             raxml(folder_name + 'sequences.fa', 'nwk')
@@ -245,6 +259,7 @@ def generateTestCases(n=500):
             rax.set_outgroup(rax.get_midpoint_outgroup())
             name(rax)
             writeTree(rax, folder_name + 'RAxML_bestTree.nwk')
+            """
 
             guestCases += 1
 
@@ -361,10 +376,10 @@ def testLikelihood(checkpoint=False):
     available_colors = ["#440154FF", "#404788FF", "#287D8EFF", "#29AF7FFF", "#95D840FF", "#FDE725FF"]
 
     if not checkpoint:
-        for nl in [4,6,8,10,12]:
+        for nl in [1, 2, 4, 8, 12]:
             for bl in np.arange(.05, .55, .05):
-                print (nl, bl)
 
+                guestLens = []
                 #it = ((nl - 4) + 1) / 2 * 10 + bl / .5 * 5
                 #printProgressBar(it, 10)
 
@@ -377,10 +392,15 @@ def testLikelihood(checkpoint=False):
                         try:
                             host, guest, names, seqs = withHost(nl, bl)
                         except:
+                            print (nl, bl), 'failure'
                             continue
 
                     name(guest)
                     name(host)
+                    guestLens.append(len(guest))
+                    if len(guest) < 4:
+                        successes += 1
+                        continue
 
                     f = open('sequences.fa','w')
                     for i in range(len(names)):
@@ -397,8 +417,9 @@ def testLikelihood(checkpoint=False):
                     f.close()
 
                     #Run RAxML
-                    if "RAxML_bestTree.nwk" in listdir('.'):
-                        system('rm RAxML*')
+                    for fname in listdir('.'):
+                        if "RAxML_" in fname:
+                            system('rm RAxML*')
                     raxml('sequences.fa', 'nwk')
                     raxml_tree = Tree('RAxML_bestTree.nwk')
                     name(raxml_tree)
@@ -409,7 +430,7 @@ def testLikelihood(checkpoint=False):
                     if score == 0:
                         successes += 1
 
-                print (nl, bl), successes
+                print (nl, bl), successes, guestLens
 
                 colors.append(available_colors[successes])
                 nLeaves.append(nl)
@@ -437,7 +458,7 @@ def treeSearchTest(n=100):
     4) n trees one spr move away from the raxml optimum tree
     """
 
-    from TreeSearch import reroot, pick_sprs, reconcileDL
+    from TreeSearch import reroot
     #from matplotlib import pyplot as plt
     #import seaborn as sns
     #sns.set()
@@ -494,7 +515,6 @@ def treeSearchTest(n=100):
 
     #Get ML score of RAxML tree
     f = list(open('RAxML_info.nwk'))
-    raxml_mlscore = 0
     for line in f:
         if "Final GAMMA-based Score of best tree" in line:
             raxml_mlscore = float(line.strip().split()[-1])
@@ -503,7 +523,6 @@ def treeSearchTest(n=100):
     print "Evaluating Guest Tree"
     result = raxml_score_from_file('RAxML_bestTree.nwk', 'guest.nwk', 'sequences.fa')
     print result
-    guest_score = result[0][0]
     score = result[1][0]
     if score == 0:
         print "Guest Tree is Not Significantly Worse than RAxML Tree"
@@ -626,12 +645,12 @@ def seqDiff(n=10, bl=1):
 
 if __name__ == "__main__":
     print datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '\n'
-    host, guest, names, seqs = withHost(8, .3)
+    #host, guest, names, seqs = withHost(8, .3)
     #treeSearchTest()
     #emMatTest()
     #for bl in [.1, .25, .5, .75, 1]:
         #seqGenTest(100, bl)
     #seqDiff(bl=.5)
     #testLikelihood()
-    #generateTestCases(500)
+    generateTestCases(100)
     print '\n', datetime.now().strftime('%Y-%m-%d %H:%M:%S')
